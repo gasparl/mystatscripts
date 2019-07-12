@@ -3,7 +3,7 @@ library("neatStats")
 library("data.table")
 library("ggplot2")
 library("ggpubr")
-setwd(paste0(script_path(), '/cd_data'))
+setwd(script_path('cd_data'))
 source("microsacc.R")
 source("smoothdata.R")
 source("vecvel.R")
@@ -59,10 +59,11 @@ plot_saccade = function() {
 }
 SAMPLING = 1000
 MINDUR = 15
-VFAC = 5
+VFAC = 10
 file_names = list.files(pattern = "^cd_assessment_.*txt$")
 file_names = list('cd_assessment_01_20190627085927.txt')
 file_names = list('cd_assessment_02_20190627110403.txt')
+file_names = list('cd_assessment_01_20190627085927.txt','cd_assessment_02_20190627110403.txt')
 
 #
 remove_practice = T
@@ -222,10 +223,10 @@ for (name_txt in file_names) {
                         ' - skipping trial num ',
                         trial_num)
                 next
-            } else if (all(abs(saccades$table[, 5]) < mon_conv(mon, 1, from = 'deg', to = 'pix')) == FALSE) {
+            } else if (all(abs(saccades$table[, 5]) < mon_conv(mon, 4, from = 'deg', to = 'pix')) == FALSE) {
                 warning(
                     'vertical move ',
-                    pix2deg(saccades$table[, 5]),
+                    mon_conv(mon, saccades$table[, 5], from = 'pix', to = 'deg'),
                     ' - skipping trial num ',
                     trial_num
                 )
@@ -283,6 +284,24 @@ data_merged$landing = mon_conv(
     from = 'pix',
     to = 'deg'
 )
+scrppd <- 1/mon_conv(
+    mon,
+    1,
+    from = 'pix',
+    to = 'deg'
+)
+
+
+# richards code:
+str(data_merged)
+library(ggplot2)
+ggplot(data_merged, aes(x = sacc_end_x/scrppd, y = sacc_end_y/scrppd)) + 
+    geom_point(size = 0.1) + facet_wrap(~target_jump_pix) + 
+    geom_density2d() + coord_fixed() + scale_y_reverse() + 
+    geom_vline(xintercept = 1920/2/scrppd, linetype = "dotted") + 
+    geom_hline(yintercept = 1080/2/scrppd, linetype = "dotted")
+
+
 
 neg_diff = data_merged[data_merged$sacc_start_to_blank < 0,]
 if (nrow(neg_diff) > 0) {
