@@ -61,34 +61,22 @@ SAMPLING = 1000
 MINDUR = 15
 VFAC = 10
 file_names = list.files(pattern = "^cd_assessment_.*txt$")
+file_names = list('cd_assessment_01_20190627085927.txt')
+file_names = list('cd_assessment_02_20190627110403.txt')
+file_names = list('cd_assessment_01_20190627085927.txt','cd_assessment_02_20190627110403.txt')
 
-file_names = list('cd_assessment_04_20190714175351.txt')
-file_names = list('cd_assessment_05_20190715092701.txt')
-file_names = list('cd_assessment_06_20190715101117.txt')
-file_names = list('cd_assessment_07_20190715124817.txt')
-file_names = list('cd_assessment_08_20190722072408.txt')
-file_names = list('cd_assessment_09_20190722090120.txt')
-file_names = list('cd_assessment_10_20190723130058.txt')
-file_names = list('cd_assessment_11_20190724131905.txt')
-
-
-file_names = list('cd_assessment_17_20190725084536.txt')
-file_names = list('cd_assessment_18_20190725103044.txt')
-
-
-file_names = list('cd_assessment_12_20190725090319.txt')
-file_names = list('cd_assessment_13_20190726131319.txt')
-
-file_names = list('cd_assessment_19_20190726155244.txt')
-
-file_names = list('cd_assessment_16_20190726161456.txt')
+file_names = list('cd_assessment_71_20190713171445.txt')
+file_names = list('cd_assessment_21_20190714144532.txt')
+file_names = list('cd_assessment_22_20190716115613.txt')
+file_names = list('cd_assessment_23_20190722074613.txt')
+file_names = list('cd_assessment_24_20190722092344.txt')
+file_names = list('cd_assessment_25_20190723140206.txt')
+file_names = list('cd_assessment_26_20190724135134.txt')
+file_names = list('cd_assessment_27_20190725093014.txt') # too many forward
+file_names = list('cd_assessment_28_20190726133736.txt')
 
 
-file_names = list('cd_assessment_06_20190715101117.txt','cd_assessment_07_20190715124817.txt', 'cd_assessment_08_20190722072408.txt', 'cd_assessment_09_20190722090120.txt', 'cd_assessment_10_20190723130058.txt')
-
-
-
-
+file_names = list('cd_assessment_21_20190714144532.txt', 'cd_assessment_22_20190716115613.txt', 'cd_assessment_23_20190722074613.txt', 'cd_assessment_24_20190722092344.txt','cd_assessment_25_20190723140206.txt', 'cd_assessment_26_20190724135134.txt')
 
 #
 remove_practice = T
@@ -309,34 +297,6 @@ data_merged$landing = mon_conv(
     from = 'pix',
     to = 'deg'
 )
-scrppd <- 1/mon_conv(
-    mon,
-    1,
-    from = 'pix',
-    to = 'deg'
-)
-
-
-# richards code:
-str(data_merged)
-library(ggplot2)
-ggplot(data_merged, aes(x = sacc_end_x/scrppd, y = sacc_end_y/scrppd)) + 
-    geom_point(size = 0.1) + facet_wrap(~target_jump_pix) + 
-    geom_density2d() + coord_fixed() + scale_y_reverse() + 
-    geom_vline(xintercept = 1920/2/scrppd, linetype = "dotted") + 
-    geom_hline(yintercept = 1080/2/scrppd, linetype = "dotted")
-
-# TODO: check component vs amplitude
-# component is the first 2, amplitude is second 2 (normally longer)
-# probably amplitude should be used
-
-
-
-neg_diff = data_merged[data_merged$sacc_start_to_blank < 0,]
-if (nrow(neg_diff) > 0) {
-    warning('blank before saccade: ', paste(neg_diff[, 2], collapse = ", "))
-    data_merged = data_merged[data_merged$sacc_start_to_blank >= 0,]
-}
 
 # median(data_merged$sacc_start_diff) # 101 : 14
 # mean(data_merged$sacc_start_diff) # 101 : 13.8676
@@ -344,140 +304,30 @@ if (nrow(neg_diff) > 0) {
 # max(data_merged$sacc_start_diff) # 101 : 21
 # sd(data_merged$sacc_start_diff) # 101 : 2.751331
 
-
-# list of last values:
-# by(data_merged$dp_target, list(data_merged$dp_landmark, data_merged$block), tail, 1)
-
-n = 6
-last_dps = aggregate(data_merged$dp_target, list(data_merged$dp_landmark, data_merged$block), tail, n)
-last_dps$x = rowSums(last_dps$x)/n
-last_dps
-
-
-subtest = NA
-subtest = 10
-blocks_to_test = NA
-blocks_to_test = c(1,2)
-#blocks_to_test = c(3,4)
-
-## accuracies ----
-
-plot_list = list()
-for (plt_index in c(1, 2)) {
-    for (indx in c(1, 2)) {
-        # indx =2
-        the_colors = c('#ff0000', '#000000', '#00cc00')
-        color_i = the_colors[indx]
-        indep_var = c(-10, 10)[indx]
-        all_data = data_merged
-        if (!is.na(subtest)) {
-            all_data = all_data[all_data$subject_id == subtest,]
-        }
-        #all_data = all_data[all_data$block < 3,]
-        # convert into 1 direction
-        all_data$forw_landmark_place = ifelse(
-            sign(all_data$target_jump_pix) == 1,
-            all_data$landmark_place,-all_data$landmark_place
-        )
-        all_data$forw_dp_target = all_data$dp_target
-        all_data$response_key = ifelse(
-            sign(all_data$target_jump_pix) == 1,
-            all_data$response_key,-all_data$response_key
-        )
-        all_data$resp[all_data$response_key == -1] = 'back'
-        all_data$resp[all_data$response_key == 0] = 'none'
-        all_data$resp[all_data$response_key == 1] = 'forward'
-        all_data$forw_dp_landmark = all_data$dp_landmark
-        # separate by landmark displacement
-        all_data = all_data[all_data$forw_dp_landmark == indep_var, ]
-        add_indeterminates = T
-        # median( all_data$blank_to_sacc_end )
-        if (plt_index == 1) {
-            if (length(blocks_to_test) > 1 || !is.na(blocks_to_test)) {
-                all_data = all_data[all_data$block %in% blocks_to_test,]
-            }
-            #add_indeterminates = T
-            #all_data = all_data[  all_data$blank_to_sacc_end > 28, ]
-            #all_data = all_data[!all_data$block > 1,]
-            #all_data = all_data[  all_data$forw_landmark_place == -4, ]
-        } else if (plt_index == 2) {
-            if (length(blocks_to_test) > 1 || !is.na(blocks_to_test)) {
-                all_data = all_data[!all_data$block %in% blocks_to_test,]
-            }
-            #add_indeterminates = F
-            #all_data = all_data[  ! all_data$blank_to_sacc_end > 28, ]
-            #all_data = all_data[all_data$block > 1,]
-            #all_data = all_data[  all_data$forw_landmark_place == 4, ]
-            #all_data = all_data[  all_data$block != 3, ]
-        }
-        
-        ### calculate below
-        
-        check_rows = nrow(all_data[!all_data$resp %in% c('back', 'none', 'forward'),])
-        if (check_rows != 0) {
-            stop('Check - check_rows not 0: ', check_rows)
-        }
-        
-        accuracy = as.data.frame.matrix(xtabs( ~ forw_dp_target + resp, all_data))
-        accuracy = data.frame(forw_dp_target = rownames(accuracy), accuracy)
-        accuracy$forw_dp_target = as.numeric(as.character(accuracy$forw_dp_target))
-        # add_indeterminates = T
-        if ((!is.null(accuracy$none)) & (add_indeterminates == T)) {
-            accuracy$back = accuracy$back + (accuracy$none %/% 2)
-            accuracy$forward = accuracy$forward + (accuracy$none %/% 2)
-        }
-        # add proportions
-        accuracy$props = accuracy$forward / (accuracy$forward + accuracy$back)
-        
-        ## curve fitting ----
-        model = glm(
-            formula = cbind(forward, back) ~ forw_dp_target,
-            family = binomial(link = "probit"),
-            data = accuracy
-        )
-        # confint(model)
-        if (indx == 1) {
-            psych_curve = ggplot(data = accuracy, aes(x = forw_dp_target, y = props)) + ylim(0, 1)
-        }
-        psych_curve = psych_curve + geom_point(data = accuracy,
-                                               aes(x = forw_dp_target, y = props),
-                                               color = color_i)
-        
-        xseq = seq(min(accuracy$forw_dp_target),
-                   max(accuracy$forw_dp_target),
-                   len = 1000)  #I used, for example, a 1000 points
-        yseq = predict(model, data.frame(forw_dp_target  = xseq), type = "response")
-        the_curve = data.frame(xseq, yseq)
-        
-        psych_curve = psych_curve + geom_line(data = the_curve,
-                                              aes(x = xseq, y = yseq),
-                                              color = color_i)
-    }
-    plot_list[[plt_index]] = psych_curve
-}
-
-ggarrange(
-    plot_list[[1]],
-    plot_list[[2]],
-    labels = c("A", "B", "C", "D"),
-    ncol = 1,
-    nrow = 2,
-    common.legend = T
-)
-
 ## landing site: forw_landing e.g. -0.8 (minus 0.8) means it landed 0.8 degree short ("before") target
+
+unique(data_merged$block)
+
+subtest = 22
+subtest = NA
+blocks_to_test = c(2,4) # c(1,2,3,4)
+divide_lands = T
+blocks_to_test = 3
+divide_lands = F
 
 plot_list = list()
 check_list = list()
-divisions = 2
+divisions = 2 # 6 is nice for merged
 for (plt_index in seq(1, 2)) {
     for (indx in seq(1, divisions)) {
         # indx =2
         color_gen = colorRampPalette(c('#FFA0A0', '#000000'))
         the_colors = color_gen(divisions)
         color_i = the_colors[indx]
-        indep_var = c(-10, 10)[plt_index] # landmark displacement
+        indep_var = c(-10, 0, 10)[plt_index] # landmark displacement
+        indep_var = c(0, 1)[plt_index]
         all_data = data_merged
+        all_data = all_data[all_data$block %in% blocks_to_test,]
         if (!is.na(subtest)) {
             all_data = all_data[all_data$subject_id == subtest,]
         }
@@ -487,7 +337,10 @@ for (plt_index in seq(1, 2)) {
             sign(all_data$target_jump_pix) == 1,
             all_data$landmark_place,-all_data$landmark_place
         )
-        all_data$forw_dp_target = all_data$dp_target
+        all_data$forw_dp_target = ifelse(
+            sign(all_data$target_jump_pix) == 1,
+            all_data$dp_target,-all_data$dp_target
+        )
         all_data$response_key = ifelse(
             sign(all_data$target_jump_pix) == 1,
             all_data$response_key,-all_data$response_key
@@ -496,26 +349,9 @@ for (plt_index in seq(1, 2)) {
         all_data$resp[all_data$response_key == 0] = 'none'
         all_data$resp[all_data$response_key == 1] = 'forward'
         all_data$forw_dp_landmark = all_data$dp_landmark
-        # separate by landmark displacement
-        #all_data = all_data[all_data$forw_dp_landmark == indep_var, ]
-        
-        if (plt_index == 1) {
-            if (length(blocks_to_test) > 1 || !is.na(blocks_to_test)) {
-                all_data = all_data[all_data$block %in% blocks_to_test,]
-            }
-            #add_indeterminates = T
-            #all_data = all_data[  all_data$blank_to_sacc_end > 28, ]
-            #all_data = all_data[!all_data$block > 1,]
-            #all_data = all_data[  all_data$forw_landmark_place == -4, ]
-        } else if (plt_index == 2) {
-            if (length(blocks_to_test) > 1 || !is.na(blocks_to_test)) {
-                all_data = all_data[!all_data$block %in% blocks_to_test,]
-            }
-            #add_indeterminates = F
-            #all_data = all_data[  ! all_data$blank_to_sacc_end > 28, ]
-            #all_data = all_data[all_data$block > 1,]
-            #all_data = all_data[  all_data$forw_landmark_place == 4, ]
-            #all_data = all_data[  all_data$block != 3, ]
+        # separate by dp_landmark where 1 is landmark displayed and 0 not
+        if (divide_lands == TRUE) {
+            all_data = all_data[all_data$forw_dp_landmark == indep_var, ]
         }
         
         thres_perc = 1 / divisions * indx
@@ -546,10 +382,10 @@ for (plt_index in seq(1, 2)) {
         accuracy = as.data.frame.matrix(xtabs( ~ forw_dp_target + resp, all_data))
         accuracy = data.frame(forw_dp_target = rownames(accuracy), accuracy)
         accuracy$forw_dp_target = as.numeric(as.character(accuracy$forw_dp_target))
-        # add_indeterminates = T
         if (is.null(accuracy$forward)) {
             accuracy$forward = 0
         }
+        # add_indeterminates = T
         if ((!is.null(accuracy$none)) & (add_indeterminates == T)) {
             accuracy$back = accuracy$back + (accuracy$none %/% 2)
             accuracy$forward = accuracy$forward + (accuracy$none %/% 2)
@@ -588,10 +424,9 @@ for (plt_index in seq(1, 2)) {
 ggarrange(
     plot_list[[1]],
     plot_list[[2]],
-    labels = c("-10", "+10"),
+    labels = c("0", "1"),
     ncol = 1,
     nrow = 2,
     common.legend = T,
     vjust = 1.3
 ) # hjust = 0.3
-
