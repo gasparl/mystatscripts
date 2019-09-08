@@ -3,6 +3,7 @@
 library("neatStats")
 library("TOSTER")
 library("plyr")
+library("aod")
 
 # COLLECT DATA ----
 
@@ -421,52 +422,133 @@ neatStats::t_neat(
 )
 
 
+## logistic regression
 
-cond_real = data.frame(full_data$rt_mean_diffs_0, full_data$dur_mean_diffs_0)
-cond_real$guilt = 1
-colnames(cond_real) = c("rt_mean", "dur_mean", "guilt")
+log_model(full_data$rt_mean_diffs_0, full_data$dur_mean_diffs_0)
+log_model(full_data$rt_mean_diffs_1, full_data$dur_mean_diffs_1)
 
-sim_rt_mean_diffs_0 = bayestestR::distribution_normal(1000,
-                                          mean = 0,
-                                          sd = sd(full_data$rt_mean_diffs_0))
-sim_dur_mean_diffs_0 = bayestestR::distribution_normal(1000,
-                                           mean = 0,
-                                           sd = sd(full_data$dur_mean_diffs_0))
+log_model(full_data$rt_mean_diffs_0, full_data$acc_rate_diffs_0)
+log_model(full_data$rt_mean_diffs_1, full_data$acc_rate_diffs_1)
 
-cond_sim = data.frame(sim_rt_mean_diffs_0, sim_dur_mean_diffs_0)
-cond_sim$guilt = 0
-colnames(cond_sim) = c("rt_mean", "dur_mean", "guilt")
+log_model3(full_data$rt_mean_diffs_0, full_data$acc_rate_diffs_0, full_data$dur_mean_diffs_0)
+log_model3(full_data$rt_mean_diffs_1, full_data$acc_rate_diffs_1, full_data$dur_mean_diffs_1)
 
-cit_data_glm = rbind(cond_real, cond_sim)
+log_model = function(pred1, pred2, n_sim = 1000) {
+    cond_real = data.frame(pred1, pred2)
+    cond_real$guilt = 1
+    colnames(cond_real) = c("p1", "p2", "guilt")
+    
+    sim_pred1 = bayestestR::distribution_normal(n_sim,
+                                                mean = 0,
+                                                sd = sd(pred1))
+    sim_pred2 = bayestestR::distribution_normal(n_sim,
+                                                mean = 0,
+                                                sd = sd(pred2))
+    
+    cond_sim = data.frame(sim_pred1, sim_pred2)
+    cond_sim$guilt = 0
+    colnames(cond_sim) = c("p1", "p2", "guilt")
+    
+    cit_data_glm = rbind(cond_real, cond_sim)
+    
+    log_regr  = glm(as.factor(guilt) ~ (p1) + (p2),
+                    data = cit_data_glm,
+                    family = "binomial")
+    print(summary(log_regr))
+    # confint(log_regr, level = .95) # profile likelihood confidence interval
+    # confint.default(log_regr, level = .95) #  Wald confidence interval
 
-library("aod")
-library("sizeMat")
+    cat("\nBOTH:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2:3
+    ))
+    cat("\nFIRST:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2
+    ))
+    cat("\nSECOND:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 3
+    ))
+    cat("", fill = TRUE)
+    cit_data_glm$fitted = log_regr$fitted.values
+    # "Logistic predictor"
+    t_neat(
+        cit_data_glm$fitted[cit_data_glm$guilt == 1],
+        cit_data_glm$fitted[cit_data_glm$guilt == 0],
+        auc_added = T,
+        bf_added = F
+    )
+}
 
-log_regr  = glm(
-    as.factor(guilt) ~ (rt_mean) + (dur_mean),
-    data = cit_data_glm,
-    family = "binomial"
-)
-print(summary(log_regr))
-nagelkerkeR2(log_regr)
-print(wald.test(
-    b = coef(log_regr),
-    Sigma = vcov(log_regr),
-    Terms = 2:3
-))
-print(wald.test(
-    b = coef(log_regr),
-    Sigma = vcov(log_regr),
-    Terms = 2
-))
-print(wald.test(
-    b = coef(log_regr),
-    Sigma = vcov(log_regr),
-    Terms = 3
-))
-cit_data_glm$fitted = log_regr$fitted.values
-# "Logistic predictor"
-t_neat(cit_data_glm$fitted[cit_data_glm$guilt == 1], cit_data_glm$fitted[cit_data_glm$guilt == 0], auc_added = T, bf_added = F)
+log_model3 = function(pred1, pred2, pred3, n_sim = 1000) {
+    cond_real = data.frame(pred1, pred2, pred3)
+    cond_real$guilt = 1
+    colnames(cond_real) = c("p1", "p2", "p3", "guilt")
+    
+    sim_pred1 = bayestestR::distribution_normal(n_sim,
+                                                mean = 0,
+                                                sd = sd(pred1))
+    sim_pred2 = bayestestR::distribution_normal(n_sim,
+                                                mean = 0,
+                                                sd = sd(pred2))
+    sim_pred3 = bayestestR::distribution_normal(n_sim,
+                                                mean = 0,
+                                                sd = sd(pred3))
+    
+    cond_sim = data.frame(sim_pred1, sim_pred2, sim_pred3)
+    cond_sim$guilt = 0
+    colnames(cond_sim) = c("p1", "p2", "p3", "guilt")
+    
+    cit_data_glm = rbind(cond_real, cond_sim)
+    
+    log_regr  = glm(as.factor(guilt) ~ (p1) + (p2) + (p3),
+                    data = cit_data_glm,
+                    family = "binomial")
+    print(summary(log_regr))
+    # confint(log_regr, level = .95) # profile likelihood confidence interval
+    # confint.default(log_regr, level = .95) #  Wald confidence interval
+    
+    cat("\nALL:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2:4
+    ))
+    cat("\nFIRST:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2
+    ))
+    cat("\nSECOND:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 3
+    ))
+    cat("\nTHIRD:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 4
+    ))
+    cat("", fill = TRUE)
+    cit_data_glm$fitted = log_regr$fitted.values
+    # "Logistic predictor"
+    t_neat(
+        cit_data_glm$fitted[cit_data_glm$guilt == 1],
+        cit_data_glm$fitted[cit_data_glm$guilt == 0],
+        auc_added = T,
+        bf_added = F
+    )
+}
 
 
 
