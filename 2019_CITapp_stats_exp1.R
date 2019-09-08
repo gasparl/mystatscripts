@@ -2,6 +2,7 @@
 
 library("neatStats")
 library("TOSTER")
+library("plyr")
 
 # COLLECT DATA ----
 
@@ -115,7 +116,6 @@ for (subject_number in subj_nums) {
                              subj_itms_base$trial_number),]
     subj_cond = as.character(subj_itms_base$device_status[1])
     
-    
     subj_acc_rates = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = valid_trial,
@@ -147,6 +147,14 @@ for (subject_number in subj_nums) {
         prefix = "dur_mean"
     )
     
+    corrs_base = ddply(subj_itms_base, c("stim_type", "device_status"), function(x)
+        cor(x$rt_start, x$hold_dur, use = "pairwise.complete.obs"))
+    
+    corrs = data.frame(
+        aggr_group = paste("corr", corrs_base$stim_type, corrs_base$device_status, sep = '_'),
+        aggr_value = corrs_base$V1
+    )
+    
     overall_acc = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = valid_trial,
@@ -155,7 +163,7 @@ for (subject_number in subj_nums) {
         prefix = "overall_acc"
     )
     
-    subject_line = table_neat(list(subj_acc_rates, subj_rt_mean, subj_dur_mean, overall_acc),
+    subject_line = table_neat(list(subj_acc_rates, subj_rt_mean, subj_dur_mean, overall_acc, corrs),
                               transpose = TRUE)
     
     subject_line = data.frame(subject_id = subject_number,
@@ -340,11 +348,145 @@ neatStats::plot_neat(
     within_ids = list(
         device = c("_0", "_1"),
         p_vs_i = c("_probe", "_irrel")
-    )
+    ),
+    reverse = T
+)
+
+
+## SIMULATED AUCS
+
+neatStats::t_neat(
+    full_data$rt_mean_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$rt_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T
+)
+neatStats::t_neat(
+    full_data$rt_mean_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$rt_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T
+)
+neatStats::t_neat(
+    full_data$acc_rate_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$acc_rate_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$acc_rate_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$acc_rate_diffs_1)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$dur_mean_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$dur_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$dur_mean_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$dur_mean_diffs_1)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
 )
 
 
 
+cond_real = data.frame(full_data$rt_mean_diffs_0, full_data$dur_mean_diffs_0)
+cond_real$guilt = 1
+colnames(cond_real) = c("rt_mean", "dur_mean", "guilt")
+
+sim_rt_mean_diffs_0 = bayestestR::distribution_normal(1000,
+                                          mean = 0,
+                                          sd = sd(full_data$rt_mean_diffs_0))
+sim_dur_mean_diffs_0 = bayestestR::distribution_normal(1000,
+                                           mean = 0,
+                                           sd = sd(full_data$dur_mean_diffs_0))
+
+cond_sim = data.frame(sim_rt_mean_diffs_0, sim_dur_mean_diffs_0)
+cond_sim$guilt = 0
+colnames(cond_sim) = c("rt_mean", "dur_mean", "guilt")
+
+cit_data_glm = rbind(cond_real, cond_sim)
+
+library("aod")
+library("sizeMat")
+
+log_regr  = glm(
+    as.factor(guilt) ~ (rt_mean) + (dur_mean),
+    data = cit_data_glm,
+    family = "binomial"
+)
+print(summary(log_regr))
+nagelkerkeR2(log_regr)
+print(wald.test(
+    b = coef(log_regr),
+    Sigma = vcov(log_regr),
+    Terms = 2:3
+))
+print(wald.test(
+    b = coef(log_regr),
+    Sigma = vcov(log_regr),
+    Terms = 2
+))
+print(wald.test(
+    b = coef(log_regr),
+    Sigma = vcov(log_regr),
+    Terms = 3
+))
+cit_data_glm$fitted = log_regr$fitted.values
+# "Logistic predictor"
+t_neat(cit_data_glm$fitted[cit_data_glm$guilt == 1], cit_data_glm$fitted[cit_data_glm$guilt == 0], auc_added = T, bf_added = F)
+
+
+
+## HOLD-DUR EXTRA
+
+mean(full_data$corr_probe_0)
+mean(full_data$corr_probe_1)
+mean(full_data$corr_irrelevant_0)
+mean(full_data$corr_irrelevant_1)
+mean(full_data$corr_target_0)
+mean(full_data$corr_target_1)
+
+
+corr_neat(full_data$rt_mean_diffs_0,  full_data$dur_mean_diffs_0 )
+corr_neat(full_data$rt_mean_diffs_1,  full_data$dur_mean_diffs_1 )
+
+corr_neat(full_data$rt_mean_diffs_0,  full_data$acc_rate_diffs_0 )
+corr_neat(full_data$rt_mean_diffs_1,  full_data$acc_rate_diffs_1 )
+
+## ALERTNESS EXTRA
 
 print("alertness per condition:")
 for (dvice_stat in list("0", "1")) {
