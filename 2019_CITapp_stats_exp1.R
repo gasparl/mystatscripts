@@ -29,6 +29,8 @@ for (filee in file_names_app) {
 if (exists("main_cit_merg")) {
     rm(main_cit_merg)
     rm(dems_merg)
+    rm(all_raw_data)
+    rm(exp_unique_names)
 }
 
 for (subject_number in subj_nums) {
@@ -131,10 +133,9 @@ for (subject_number in subj_nums) {
         values = rt_start,
         method = mean,
         group_by = c("stim_type", "device_status"),
-        filt = (rt_start >= 150 & valid_trial == 1),
+        filt = (valid_trial == 1),
         prefix = "rt_mean"
     )
-    
     
     subj_itms_base$rt_end[subj_itms_base$rt_end > 1100] = NA
     subj_itms_base$hold_dur = subj_itms_base$rt_end - subj_itms_base$rt_start
@@ -144,7 +145,7 @@ for (subject_number in subj_nums) {
         values = hold_dur,
         method = mean,
         group_by = c("stim_type", "device_status"),
-        filt = (rt_start >= 150 & valid_trial == 1),
+        filt = (valid_trial == 1),
         prefix = "dur_mean"
     )
     
@@ -170,6 +171,26 @@ for (subject_number in subj_nums) {
     subject_line = data.frame(subject_id = subject_number,
                               condition = subj_cond,
                               subject_line)
+    
+    #### split-half reliability
+    
+    probs_sh = subj_itms_base[subj_itms_base$stim_type == "probe" &
+                                  subj_itms_base$valid_trial == 1,]
+    probs_sh_odd = probs_sh[seq(1, nrow(probs_sh), 2),]
+    probs_sh_even = probs_sh[seq(2, nrow(probs_sh), 2),]
+    
+    irrs_sh = subj_itms_base[subj_itms_base$stim_type == "irrelevant" &
+                                 subj_itms_base$valid_trial == 1,]
+    irrs_sh_odd = irrs_sh[seq(1, nrow(irrs_sh), 2),]
+    irrs_sh_even = irrs_sh[seq(2, nrow(irrs_sh), 2),]
+    
+    subject_line$rt_diff_odd_0 = mean(probs_sh_odd$rt_start[probs_sh_odd$device_status == 0]) - mean(irrs_sh_odd$rt_start[irrs_sh_odd$device_status == 0])
+    subject_line$rt_diff_even_0 = mean(probs_sh_even$rt_start[probs_sh_even$device_status == 0]) - mean(irrs_sh_even$rt_start[irrs_sh_even$device_status == 0])
+    
+    subject_line$rt_diff_odd_1 = mean(probs_sh_odd$rt_start[probs_sh_odd$device_status == 1]) - mean(irrs_sh_odd$rt_start[irrs_sh_odd$device_status == 1])
+    subject_line$rt_diff_even_1 = mean(probs_sh_even$rt_start[probs_sh_even$device_status == 1]) - mean(irrs_sh_even$rt_start[irrs_sh_even$device_status == 1])
+    
+    ##
     
     dems_l = list.files(pattern = paste(
         "^CIT_Mobile_demographics",
@@ -322,7 +343,6 @@ dataTOSTpaired(
 )
 
 names(full_data)
-
 
 neatStats::anova_neat(
     data_per_subject = full_data,
@@ -600,6 +620,16 @@ corr_neat(full_data$rt_mean_diffs_0,  full_data$acc_rate_diffs_0)
 corr_neat(full_data$rt_mean_diffs_1,
           full_data$dur_mean_diffs_1)
 corr_neat(full_data$rt_mean_diffs_1,  full_data$acc_rate_diffs_1)
+
+
+## split-halves
+
+# "Split-half reliability:"
+r_pearson_0 = corr_neat(full_data$rt_diff_odd_0, full_data$rt_diff_even_0)['r']
+r_pearson_1 = corr_neat(full_data$rt_diff_odd_1, full_data$rt_diff_even_1)['r']
+# Spearman-Brown correction
+print((2 * r_pearson_0) / (1 + r_pearson_0))
+print((2 * r_pearson_1) / (1 + r_pearson_1))
 
 
 # SAVE -----

@@ -2,6 +2,8 @@
 
 library("neatStats")
 library("TOSTER")
+library("plyr")
+library("aod")
 
 # COLLECT DATA ----
 
@@ -12,7 +14,10 @@ if ( exists("main_cit_merg") ) {
     rm(main_cit_merg)
     rm(dems_merg)
     rm(all_raw_data)
+    rm(exp_unique_names)
 }
+
+# exp1_unique_names = exp_unique_names
 
 for(f_name in file_names){
     #f_name = "CIT_Mobile_app_exp2_1_1_1_1_1547033034378.txt"
@@ -42,18 +47,73 @@ for(f_name in file_names){
         print(nrow(subj_itms_base))
         stop("trial num incorrect")
     }
+
+
+    # all_unique_names = subj_itms_base[!duplicated(subj_itms_base$stimulus_shown), ]
+    # if (nrow(all_unique_names) != 12) {
+    #     # just double-check
+    #     print("number of unique names:")
+    #     print(nrow(all_unique_names))
+    #     stop("name problem")
+    # }
+    # 
+    # if ( exists("exp2_unique_names") ) {
+    #     exp2_unique_names =  merge( exp2_unique_names, all_unique_names, all = T)
+    # } else {
+    #     exp2_unique_names = all_unique_names
+    # }
+
+
+    # exp1_names = exp1_unique_names[, c("subject_id",
+    #                                    "category",
+    #                                    "stim_type",
+    #                                    "stimulus_shown",
+    #                                    "date_in_ms")]
+    # exp2_names = exp2_unique_names[, c("subject_id",
+    #                                    "category",
+    #                                    "stim_type",
+    #                                    "stimulus_shown",
+    #                                    "date_in_ms")]
+    # exp1_names$subject_id = paste0("1_", exp1_names$subject_id)
+    # exp2_names$subject_id = paste0("2_", exp2_names$subject_id)
+    # final_names = rbind(exp1_names, exp2_names)
+    # 
+    # all_probes = final_names[final_names$stim_type == "probe",]
+    # all_irrs = final_names[final_names$stim_type == "irrelevant",]
+    # all_targs_irrs = final_names[final_names$stim_type %in% c("target","irrelevant"),]
+    # 
+    # length(all_probes$stimulus_shown)
+    # length(unique(all_probes$stimulus_shown))
+    # 
+    # length(all_irrs$stimulus_shown)
+    # length(unique(all_irrs$stimulus_shown))
+    # 
+    # ps_in_irrs = all_probes$stimulus_shown[all_probes$stimulus_shown %in% all_irrs$stimulus_shown]
+    # #ps_in_targs_irrs = all_probes$stimulus_shown[all_probes$stimulus_shown %in% all_targs_irrs$stimulus_shown]
+    # length(ps_in_irrs)
+    # ps_in_irrs_freq = aggregate(data.frame(count = ps_in_irrs), list(value = ps_in_irrs), length)
+    # nrow(ps_in_irrs_freq)
+    # mean(ps_in_irrs_freq$count)
+    # 
+    # # length(ps_in_targs_irrs)
+    # 
+    # irrs_in_ps = all_irrs$stimulus_shown[all_irrs$stimulus_shown %in% all_probes$stimulus_shown]
+    # #ps_in_targs_irrs = all_probes$stimulus_shown[all_probes$stimulus_shown %in% all_targs_irrs$stimulus_shown]
+    # length(irrs_in_ps)
+    # irrs_in_ps_freq = aggregate(data.frame(count = irrs_in_ps), list(value = irrs_in_ps), length)
+    # nrow(irrs_in_ps_freq)
+    # mean(irrs_in_ps_freq$count)
     
-    
+
     # all_unique_names = subj_itms_base[!duplicated(subj_itms_base$stimulus_shown), ]
     # all_unique_names = all_unique_names[all_unique_names$stim_type == "probe", ]
-    # if ( exists("exp_unique_names") ) {
-    #     exp_unique_names =  merge( exp_unique_names, all_unique_names, all = T)
+    # if ( exists("exp2_unique_names") ) {
+    #     exp2_unique_names =  merge( exp2_unique_names, all_unique_names, all = T)
     # } else {
-    #     exp_unique_names = all_unique_names
+    #     exp2_unique_names = all_unique_names
     # }
-    #xx = exp_unique_names[ , c("subject_id","condition","stimulus_shown", "date_in_ms")] 
+    #xx = exp2_unique_names[ , c("subject_id","condition","stimulus_shown", "date_in_ms")] 
     #xx = dcast(setDT( xx ), subject_id ~ rowid(subject_id, prefix = "name"), value.var = c("stimulus_shown","condition","date_in_ms" ) )
-    
     #xx = reshape(xx, idvar=c("subject_id"), direction="wide")
     
     
@@ -114,6 +174,14 @@ for(f_name in file_names){
         prefix = "dur_mean"
     )
     
+    corrs_base = ddply(subj_itms_base, c("stim_type", "handposition"), function(x)
+        cor(x$rt_start, x$hold_dur, use = "pairwise.complete.obs"))
+    
+    corrs = data.frame(
+        aggr_group = paste("corr", corrs_base$stim_type, corrs_base$handposition, sep = '_'),
+        aggr_value = corrs_base$V1
+    ) 
+    
     overall_acc = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = valid_trial,
@@ -122,12 +190,32 @@ for(f_name in file_names){
         prefix = "overall_acc"
     )
     
-    subject_line = table_neat(list(subj_acc_rates, subj_rt_mean, subj_dur_mean, overall_acc),
+    subject_line = table_neat(list(subj_acc_rates, subj_rt_mean, subj_dur_mean, overall_acc, corrs),
                               transpose = TRUE)
     
     subject_line = data.frame(subject_id = subject_number,
                               condition = subj_cond,
                               subject_line)
+    
+    #### split-half reliability
+    
+    probs_sh = subj_itms_base[subj_itms_base$stim_type == "probe" &
+                                  subj_itms_base$valid_trial == 1,]
+    probs_sh_odd = probs_sh[seq(1, nrow(probs_sh), 2),]
+    probs_sh_even = probs_sh[seq(2, nrow(probs_sh), 2),]
+    
+    irrs_sh = subj_itms_base[subj_itms_base$stim_type == "irrelevant" &
+                                 subj_itms_base$valid_trial == 1,]
+    irrs_sh_odd = irrs_sh[seq(1, nrow(irrs_sh), 2),]
+    irrs_sh_even = irrs_sh[seq(2, nrow(irrs_sh), 2),]
+    
+    subject_line$rt_diff_odd_0 = mean(probs_sh_odd$rt_start[probs_sh_odd$handposition == 0]) - mean(irrs_sh_odd$rt_start[irrs_sh_odd$handposition == 0])
+    subject_line$rt_diff_even_0 = mean(probs_sh_even$rt_start[probs_sh_even$handposition == 0]) - mean(irrs_sh_even$rt_start[irrs_sh_even$handposition == 0])
+    
+    subject_line$rt_diff_odd_1 = mean(probs_sh_odd$rt_start[probs_sh_odd$handposition == 1]) - mean(irrs_sh_odd$rt_start[irrs_sh_odd$handposition == 1])
+    subject_line$rt_diff_even_1 = mean(probs_sh_even$rt_start[probs_sh_even$handposition == 1]) - mean(irrs_sh_even$rt_start[irrs_sh_even$handposition == 1])
+    
+    ##
     
     dems_string = subj_data[startsWith(as.character(subj_data$subject_id), 'dems'),]$condition
     dems = c(subject_number, strsplit(as.character(dems_string), "/")[[1]])
@@ -294,8 +382,155 @@ neatStats::plot_neat(
 )
 
 
-corr_neat(full_data$rt_mean_diffs_0,  full_data$dur_mean_diffs_0 )
-corr_neat(full_data$rt_mean_diffs_0,  full_data$acc_rate_diffs_0 )
+## SIMULATED AUCS
+
+neatStats::t_neat(
+    full_data$rt_mean_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$rt_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T
+)
+neatStats::t_neat(
+    full_data$rt_mean_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$rt_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T
+)
+neatStats::t_neat(
+    full_data$acc_rate_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$acc_rate_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$acc_rate_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$acc_rate_diffs_1)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$dur_mean_diffs_0,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$dur_mean_diffs_0)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+neatStats::t_neat(
+    full_data$dur_mean_diffs_1,
+    bayestestR::distribution_normal(
+        1000,
+        mean = 0,
+        sd = sd(full_data$dur_mean_diffs_1)
+    ),
+    bf_added = F,
+    auc_added = T,
+    auc_greater = '2'
+)
+
+
+## logistic regression
+
+log_model(full_data$rt_mean_diffs_0, full_data$dur_mean_diffs_0)
+log_model(full_data$rt_mean_diffs_1, full_data$dur_mean_diffs_1)
+
+log_model(full_data$rt_mean_diffs_0, full_data$acc_rate_diffs_0)
+log_model(full_data$rt_mean_diffs_1, full_data$acc_rate_diffs_1)
+
+
+log_model = function(pred1, pred2, n_sim = 1000) {
+    cond_real = data.frame(pred1, pred2)
+    cond_real$guilt = 1
+    colnames(cond_real) = c("rt_mean", "dur_mean", "guilt")
+    
+    sim_rt_mean_diffs_0 = bayestestR::distribution_normal(n_sim,
+                                                          mean = 0,
+                                                          sd = sd(pred1))
+    sim_dur_mean_diffs_0 = bayestestR::distribution_normal(n_sim,
+                                                           mean = 0,
+                                                           sd = sd(pred2))
+    
+    cond_sim = data.frame(sim_rt_mean_diffs_0, sim_dur_mean_diffs_0)
+    cond_sim$guilt = 0
+    colnames(cond_sim) = c("rt_mean", "dur_mean", "guilt")
+    
+    cit_data_glm = rbind(cond_real, cond_sim)
+    
+    log_regr  = glm(as.factor(guilt) ~ (rt_mean) + (dur_mean),
+                    data = cit_data_glm,
+                    family = "binomial")
+    print(summary(log_regr))
+    # confint(log_regr, level = .95) # profile likelihood confidence interval
+    # confint.default(log_regr, level = .95) #  Wald confidence interval
+    
+    cat("\nBOTH:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2:3
+    ))
+    cat("\nFIRST:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 2
+    ))
+    cat("\nSECOND:", fill = TRUE)
+    print(wald.test(
+        b = coef(log_regr),
+        Sigma = vcov(log_regr),
+        Terms = 3
+    ))
+    cat("", fill = TRUE)
+    cit_data_glm$fitted = log_regr$fitted.values
+    # "Logistic predictor"
+    t_neat(
+        cit_data_glm$fitted[cit_data_glm$guilt == 1],
+        cit_data_glm$fitted[cit_data_glm$guilt == 0],
+        auc_added = T,
+        bf_added = F
+    )
+}
+
+
+## HOLD-DUR EXTRA
+
+mean(full_data$corr_probe_0)
+mean(full_data$corr_probe_1)
+mean(full_data$corr_irrelevant_0)
+mean(full_data$corr_irrelevant_1)
+mean(full_data$corr_target_0)
+mean(full_data$corr_target_1)
+
+
+corr_neat(full_data$rt_mean_diffs_0,  full_data$dur_mean_diffs_0)
+corr_neat(full_data$rt_mean_diffs_1,  full_data$dur_mean_diffs_1)
+
+corr_neat(full_data$rt_mean_diffs_0,  full_data$acc_rate_diffs_0)
+corr_neat(full_data$rt_mean_diffs_1,  full_data$acc_rate_diffs_1)
+
+## SCREEN SIZE EXTRA
 
 data_screen_size = full_data[!(full_data$length == "na"), ]
 data_screen_size$length = as.numeric( as.character( data_screen_size$length ) )
@@ -314,6 +549,16 @@ corr_neat(data_screen_size$acc_rate_diffs_0,  data_screen_size$width * data_scre
 corr_neat(data_screen_size$acc_rate_diffs_1,  data_screen_size$width )
 corr_neat(data_screen_size$acc_rate_diffs_1,  data_screen_size$length )
 corr_neat(data_screen_size$acc_rate_diffs_1,  data_screen_size$width * data_screen_size$length )
+
+## split-halves
+
+# "Split-half reliability:"
+r_pearson_0 = corr_neat(full_data$rt_diff_odd_0, full_data$rt_diff_even_0)['r']
+r_pearson_1 = corr_neat(full_data$rt_diff_odd_1, full_data$rt_diff_even_1)['r']
+# Spearman-Brown correction
+print((2 * r_pearson_0) / (1 + r_pearson_0))
+print((2 * r_pearson_1) / (1 + r_pearson_1))
+
 
 # SAVE -----
 
