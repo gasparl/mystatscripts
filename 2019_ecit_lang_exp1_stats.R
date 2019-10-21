@@ -4,7 +4,7 @@ library("neatStats")
 
 # COLLECT DATA ----
 
-setwd(path_neat("lang_results/simmed"))
+setwd(path_neat("lang_results/exp1"))
 file_names = list.files(pattern = "^exp_ecit_lang.*txt$")
 
 if ( exists("main_cit_merg") ) {
@@ -17,7 +17,7 @@ if ( exists("main_cit_merg") ) {
 # exp1_unique_names = exp_unique_names
 
 for(f_name in file_names){
-    #f_name = "exp_ecit_lang_1_1_03_20191011165227.txt"
+    #f_name = "exp_ecit_lang_1_001_20191021125932.txt"
 
     print(f_name)
 
@@ -83,6 +83,7 @@ for(f_name in file_names){
         prefix = "rt_mean"
     )
 
+    subj_itms_base$press_duration = as.numeric(as.character(subj_itms_base$press_duration))
     subj_dur_mean = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = press_duration,
@@ -191,7 +192,7 @@ neatStats::dems_neat(full_data, percent = F)
 
 # ANALYSIS ----
 
-print("::::::::::::::::::::::::::::::CONDITION - Index (0) or Thumb (1)::::::::::::::::::::::::::::::::::::")
+print(":::::::::::::::::::::::CONDITION - pseudo_irr (0) vs. unfam_irr (1) :::::::::::::::::::::")
 
 neatStats::t_neat(full_data$rt_mean_probe_0,
                   full_data$rt_mean_irrelevant_0,
