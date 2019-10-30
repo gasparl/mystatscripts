@@ -7,6 +7,7 @@ library("neatStats")
 setwd(path_neat("lang_results/exp1"))
 file_names = list.files(pattern = "^exp_ecit_lang.*txt$")
 
+
 if ( exists("main_cit_merg") ) {
     rm(main_cit_merg)
     rm(dems_merg)
@@ -64,6 +65,7 @@ for(f_name in file_names){
     }
 
     # "pseudo_irr" - 0; "unfam_irr" - 1
+    # condition 1: unfam_irr first; condition 2: pseudo_irr first
 
     subj_acc_rates = neatStats::aggr_neat(
         dat = subj_itms_base,
@@ -167,6 +169,8 @@ main_cit_data = main_cit_data[ main_cit_data$main_overall_acc > 0.75, ]
 main_cit_check$remaining = ifelse(main_cit_check$subject_id %in% main_cit_data$subject_id,
                                   'remained',
                                   'excluded')
+
+# accuracy exclusion
 aggr_neat(
     dat = main_cit_check,
     values = main_overall_acc,
@@ -174,18 +178,35 @@ aggr_neat(
     method = length
 )
 
-full_data = main_cit_data[main_cit_data$correct == 4, ]
+full_but_lex = main_cit_data[main_cit_data$correct == 4, ]
 
-main_cit_data$remaining = ifelse(main_cit_data$subject_id %in% full_data$subject_id,
+main_cit_data$remaining = ifelse(main_cit_data$subject_id %in% full_but_lex$subject_id,
                                  'remained',
                                  'excluded')
 
+# probes recognition exclusion
 aggr_neat(
     dat = main_cit_data,
     values = main_overall_acc,
     group_by = c('condition', 'remaining'),
     method = length
 )
+
+full_but_lex$lextale = as.numeric(as.character(full_but_lex$lextale))
+full_data = full_but_lex[full_but_lex$lextale >= 60, ]
+
+full_but_lex$remaining = ifelse(full_but_lex$subject_id %in% full_data$subject_id,
+                                 'remained',
+                                 'excluded')
+
+# lextale exclusion
+aggr_neat(
+    dat = full_but_lex,
+    values = main_overall_acc,
+    group_by = c('condition', 'remaining'),
+    method = length
+)
+
 
 # demographics
 neatStats::dems_neat(full_data, percent = F)
@@ -215,6 +236,7 @@ neatStats::t_neat(full_data$dur_mean_probe_1,
                   full_data$dur_mean_irrelevant_1,
                   pair = T)
 
+# within condition differences
 
 neatStats::t_neat(full_data$rt_mean_diffs_0, full_data$rt_mean_diffs_1, pair = T)
 neatStats::t_neat(full_data$acc_rate_diffs_0,
@@ -224,6 +246,16 @@ neatStats::t_neat(full_data$dur_mean_diffs_0,
                   full_data$dur_mean_diffs_1,
                   pair = T)
 
+# first block between condition differences
+# condition 1: unfam_irr first; condition 2: pseudo_irr first
+# "pseudo_irr" - 0; "unfam_irr" - 1
+
+neatStats::t_neat(full_data$rt_mean_diffs_0[full_data$condition == 2], full_data$rt_mean_diffs_1[full_data$condition == 1])
+
+# correlation with LexTALE
+
+neatStats::corr_neat(full_data$rt_mean_diffs_0, full_data$lextale)
+neatStats::corr_neat(full_data$rt_mean_diffs_1, full_data$lextale)
 
 ## SIMULATED AUCS
 
@@ -232,7 +264,7 @@ neatStats::t_neat(
     bayestestR::distribution_normal(
         1000,
         mean = 0,
-        sd = sd(full_data$rt_mean_diffs_0)
+        sd = sd(full_data$rt_mean_diffs_0)*0.5+7
     ),
     bf_added = F,
     auc_added = T
@@ -242,7 +274,7 @@ neatStats::t_neat(
     bayestestR::distribution_normal(
         1000,
         mean = 0,
-        sd = sd(full_data$rt_mean_diffs_1)
+        sd = sd(full_data$rt_mean_diffs_1)*0.5+7
     ),
     bf_added = F,
     auc_added = T
