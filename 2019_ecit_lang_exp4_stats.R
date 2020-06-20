@@ -1,10 +1,11 @@
 # libs ----
 
 library("neatStats")
+library("plyr")
 
 # COLLECT DATA ----
 
-setwd(path_neat("lang_results/exp3"))
+setwd(path_neat("lang_results/exp4"))
 procsv_names = list.files(pattern = "^prolific_export_.*csv$")
 if (exists("dems_pro")) {
     rm(dems_pro)
@@ -46,7 +47,7 @@ colnames(dems_pro)[1] = "userid"
 
 # duplicated(dems_pro$userid)
 
-file_names = list.files(pattern = "^lg_exp3_.*txt$")
+file_names = list.files(pattern = "^lg_exp4_.*txt$")
 
 if (exists("main_cit_merg")) {
     rm(main_cit_merg)
@@ -55,7 +56,7 @@ if (exists("main_cit_merg")) {
 # exp1_unique_names = exp_unique_names
 
 for (f_name in file_names) {
-    #f_name = "lg_exp3_yes_QOR_20200328205826.txt"
+    #f_name = "lg_exp4_hu_SOX_20200611204120.txt"
     
     print(f_name)
     
@@ -68,12 +69,20 @@ for (f_name in file_names) {
         stringsAsFactors = FALSE
     )
     
+    dems_row = subj_data[startsWith(as.character(subj_data$subject_id), 'dems'), ]
+    dems_heads = strsplit(dems_row[[2]], "/")[[1]]
+    dems_dat = strsplit(dems_row[[3]], "/")[[1]]
+    dems = do.call(rbind.data.frame, list(dems_dat))
+    colnames(dems) = dems_heads
+    
+    subj_data$stim_type[grepl('_fill$', subj_data$stim_type)] = "nontargflr"
     subj_data$stim_type[grepl('^irrelevant', subj_data$stim_type)] = "irrelevant"
     
     subj_itms_base = subj_data[subj_data$phase == 'main', ]
     # subj_itms_base = subj_data[subj_data$phase == 'main' & subj_data$trial_number <= 81, ]
+    dems$first_lg = subj_data$tested_lang[1]
     
-    if (nrow(subj_itms_base) != 648) {
+    if (nrow(subj_itms_base) != 648*2) {
         # just double-check
         # print("number of rows:")
         # print(nrow(subj_itms_base))
@@ -88,24 +97,32 @@ for (f_name in file_names) {
         0
     )
     
-    probs = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
-                                        subj_itms_base$stim_type == 'probe']
-    irrs = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
-                                       subj_itms_base$stim_type == 'irrelevant']
-    
-    dcit = t_neat(probs, irrs, bf_added = FALSE, hush = TRUE)$stats['d']
+    probs1 = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
+                                         subj_itms_base$stim_type == 'probe' &
+                                         subj_itms_base$test_num == '1']
+    irrs1 = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
+                                        subj_itms_base$stim_type == 'irrelevant' &
+                                        subj_itms_base$test_num == '1']
+    probs2 = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
+                                         subj_itms_base$stim_type == 'probe' &
+                                         subj_itms_base$test_num == '2']
+    irrs2 = subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
+                                        subj_itms_base$stim_type == 'irrelevant' &
+                                        subj_itms_base$test_num == '2']
+    dems$dcitph1 = t_neat(probs1, irrs1, bf_added = FALSE, hush = TRUE)$stats['d']
+    dems$dcitph2 = t_neat(probs2, irrs2, bf_added = FALSE, hush = TRUE)$stats['d']
     
     subj_acc_rates = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = valid_trial,
         method = mean,
-        group_by = c("stim_type"),
+        group_by = c("stim_type", 'tested_lang'),
         filt = (rt_start >= 150),
         prefix = "acc_rate"
     )
     
     subj_acc_rate_blocks = neatStats::aggr_neat(
-        dat = subj_itms_base,
+        dat = subj_itms_base[subj_itms_base$tested_lang == dems$l1,],
         values = valid_trial,
         method = mean,
         group_by = c("stim_type", "block_number"),
@@ -117,22 +134,13 @@ for (f_name in file_names) {
         dat = subj_itms_base,
         values = rt_start,
         method = mean,
-        group_by = c("stim_type"),
+        group_by = c("stim_type", 'tested_lang'),
         filt = (rt_start >= 150 & valid_trial == 1),
         prefix = "rt_mean"
     )
     
-    subj_rt_sd = neatStats::aggr_neat(
-        dat = subj_itms_base,
-        values = rt_start,
-        method = sd,
-        group_by = c("stim_type"),
-        filt = (rt_start >= 150 & valid_trial == 1),
-        prefix = "rt_sd"
-    )
-    
     subj_rt_mean_blocks = neatStats::aggr_neat(
-        dat = subj_itms_base,
+        dat = subj_itms_base[subj_itms_base$tested_lang == dems$l1,],
         values = rt_start,
         method = mean,
         group_by = c("stim_type", "block_number"),
@@ -140,19 +148,27 @@ for (f_name in file_names) {
         prefix = "rt_B_mean"
     )
     
+    subj_rt_mean_fillertype = neatStats::aggr_neat(
+        dat = subj_itms_base[subj_itms_base$tested_lang == dems$l1,],
+        values = rt_start,
+        method = mean,
+        group_by = c("stim_type", "fillertype"),
+        filt = (rt_start >= 150 & valid_trial == 1),
+        prefix = "rt_mean"
+    )
     
     subj_itms_base$press_duration = as.numeric(subj_itms_base$press_duration)
     subj_dur_mean = neatStats::aggr_neat(
         dat = subj_itms_base,
         values = press_duration,
         method = mean,
-        group_by = c("stim_type"),
+        group_by = c("stim_type", 'tested_lang'),
         filt = (rt_start >= 150 & valid_trial == 1),
         prefix = "dur_mean"
     )
     
     subj_dur_mean_blocks = neatStats::aggr_neat(
-        dat = subj_itms_base,
+        dat = subj_itms_base[subj_itms_base$tested_lang == dems$l1,],
         values = press_duration,
         method = mean,
         group_by = c("stim_type", "block_number"),
@@ -175,8 +191,8 @@ for (f_name in file_names) {
             subj_dur_mean,
             subj_acc_rate_blocks,
             subj_rt_mean_blocks,
-            subj_rt_sd,
             subj_dur_mean_blocks,
+            subj_rt_mean_fillertype,
             overall_acc
         ),
         transpose = TRUE
@@ -195,148 +211,188 @@ for (f_name in file_names) {
             mean(blocks$rt_start[blocks$stim_type == "irrelevant"])
     }
     
-    dems_row = subj_data[startsWith(as.character(subj_data$subject_id), 'dems'), ]
-    dems_heads = strsplit(dems_row[[2]], "/")[[1]]
-    dems_dat = strsplit(dems_row[[3]], "/")[[1]]
-    dems = do.call(rbind.data.frame, list(dems_dat))
-    colnames(dems) = dems_heads
-    dems$dcitph = dcit
-    
     subject_line = cbind(dems, subject_line, rt_perb)
     
     if (exists("main_cit_merg")) {
         # add subject aggregations
-        main_cit_merg =  merge(main_cit_merg, subject_line, all = T)
+        main_cit_merg =  rbind.fill(main_cit_merg, subject_line)
     } else {
         main_cit_merg = subject_line
     }
 }
 
+main_cit_prep = main_cit_merg
+
 # i = 0
-# for (x in sort(as.character(main_cit_merg$subject_id))) {
+# for (x in sort(as.character(main_cit_prep$subject_id))) {
 #     i = i+1
 #     print(i)
 #     print(x)
 # }
 
-main_cit_merg$rt_mean_diffs = main_cit_merg$rt_mean_probe - main_cit_merg$rt_mean_irrelevant
-main_cit_merg$dur_mean_diffs = main_cit_merg$dur_mean_probe -
-    main_cit_merg$dur_mean_irrelevant
-main_cit_merg$acc_rate_diffs = main_cit_merg$acc_rate_probe - main_cit_merg$acc_rate_irrelevant
+for (colname in names(main_cit_prep)) {
+    if (class(main_cit_prep[[colname]]) ==  "numeric" &
+        grepl("_probe_", colname, fixed = TRUE)) {
+        dat_probe = main_cit_prep[[colname]]
+        dat_irrel = main_cit_prep[[sub("_probe_", "_irrelevant_", colname)]]
+        newcol = sub("_probe_", "_diff_", colname)
+        main_cit_prep[[newcol]] = dat_probe - dat_irrel
+        if (grepl("_pl$|_hu$", colname)) {
+            l1_col = sub("_pl$|_hu$", "_l1", newcol)
+            if (!l1_col %in% colnames(main_cit_prep)) {
+                main_cit_prep[[l1_col]] = -1
+            }
+            main_cit_prep[[l1_col]] = ifelse(
+                main_cit_prep$l1 == substr(newcol, nchar(newcol) -
+                                               1, nchar(newcol)),
+                main_cit_prep[[newcol]],
+                main_cit_prep[[l1_col]]
+            )
+        }
+    }
+}
 
-main_cit_merg$main_overall_acc = ((main_cit_merg$overall_acc_probe) + main_cit_merg$overall_acc_irrelevant * 4) / 5
 
-main_cit_merg$rt_B_mean_diffs_1 = main_cit_merg$rt_B_mean_probe_4 - main_cit_merg$rt_B_mean_irrelevant_4
-main_cit_merg$rt_B_mean_diffs_2 = main_cit_merg$rt_B_mean_probe_6 - main_cit_merg$rt_B_mean_irrelevant_6
-main_cit_merg$rt_B_mean_diffs_3 = main_cit_merg$rt_B_mean_probe_8 - main_cit_merg$rt_B_mean_irrelevant_8
-main_cit_merg$rt_B_mean_diffs_4 = main_cit_merg$rt_B_mean_probe_10 - main_cit_merg$rt_B_mean_irrelevant_10
+main_cit_prep$main_overall_acc = ((main_cit_prep$overall_acc_probe) + main_cit_prep$overall_acc_irrelevant * 4) / 5
 
-main_cit_merg$acc_B_rate_diffs_1 = main_cit_merg$acc_B_rate_probe_4 - main_cit_merg$acc_B_rate_irrelevant_4
-main_cit_merg$acc_B_rate_diffs_2 = main_cit_merg$acc_B_rate_probe_6 - main_cit_merg$acc_B_rate_irrelevant_6
-main_cit_merg$acc_B_rate_diffs_3 = main_cit_merg$acc_B_rate_probe_8 - main_cit_merg$acc_B_rate_irrelevant_8
-main_cit_merg$acc_B_rate_diffs_4 = main_cit_merg$acc_B_rate_probe_10 - main_cit_merg$acc_B_rate_irrelevant_10
 
-main_cit_merg$dur_B_mean_diffs_1 = main_cit_merg$dur_B_mean_probe_4 - main_cit_merg$dur_B_mean_irrelevant_4
-main_cit_merg$dur_B_mean_diffs_2 = main_cit_merg$dur_B_mean_probe_6 - main_cit_merg$dur_B_mean_irrelevant_6
-main_cit_merg$dur_B_mean_diffs_3 = main_cit_merg$dur_B_mean_probe_8 - main_cit_merg$dur_B_mean_irrelevant_8
-main_cit_merg$dur_B_mean_diffs_4 = main_cit_merg$dur_B_mean_probe_10 - main_cit_merg$dur_B_mean_irrelevant_10
+# sort(main_cit_prep$main_overall_acc)
+# cat(as.character(main_cit_prep$userid[main_cit_prep$l1 == "pl"]), sep = ",", fill = T)
+# cat(as.character(main_cit_prep$userid[main_cit_prep$l1 == "hu"]), sep = ",", fill = T)
 
-main_cit_withdems = merge(main_cit_merg, dems_pro, by = "userid", all = TRUE)
+# cat(as.character(main_cit_prep$userid[main_cit_prep$l1 == "hu" &
+#                                           main_cit_prep$bonus == 1]),
+#     sep = ",0.5\n",
+#     fill = T)
+# cat(as.character(main_cit_prep$userid[main_cit_prep$l1 == "hu" &
+#                                           main_cit_prep$bonus == 2]),
+#     sep = ",1.0\n",
+#     fill = T)
 
-# cat(as.character(main_cit_withdems$userid[main_cit_withdems$speaker == "yes"]), sep = ",", fill = T)
-# cat(as.character(main_cit_withdems$userid[main_cit_withdems$speaker == "no"]), sep = ",", fill = T)
 
-main_cit_withdems$lextale = as.numeric(as.character(main_cit_withdems$lextale))
-main_cit_check = main_cit_withdems[main_cit_withdems$lextale >= 60 |
-                              is.na(main_cit_withdems$lextale),]
+main_cit_withdems = merge(main_cit_prep, dems_pro, by = "userid", all = TRUE)
 
-main_cit_withdems$remaining = ifelse(main_cit_withdems$subject_id %in% main_cit_check$subject_id,
-                                 'remained',
-                                 'excluded')
+main_cit_withdems$probe_correct1 = as.numeric(as.character(main_cit_withdems$probe_correct1))
+main_cit_withdems$probe_correct2 = as.numeric(as.character(main_cit_withdems$probe_correct2))
+main_cit_corrprob = main_cit_withdems[(
+    main_cit_withdems$probe_correct1 > 2 &
+        main_cit_withdems$l1 == main_cit_withdems$first_lg
+) |
+    (
+        main_cit_withdems$probe_correct2 > 2 &
+            main_cit_withdems$l1 != main_cit_withdems$first_lg
+    ),]
 
-# lextale exclusion
-aggr_neat(
-    dat = main_cit_withdems,
-    values = main_overall_acc,
-    group_by = c('remaining', 'speaker'),
-    method = length
+
+main_cit_withdems$remaining = ifelse(
+    main_cit_withdems$subject_id %in% main_cit_corrprob$subject_id,
+    'remained',
+    'excluded'
 )
 
-
-main_cit_data = main_cit_check
-
-main_cit_data = main_cit_data[main_cit_data$overall_acc_target > 0.5,]
-main_cit_data = main_cit_data[main_cit_data$overall_acc_targetflr > 0.5,]
-main_cit_data = main_cit_data[main_cit_data$overall_acc_nontargflr > 0.5,]
-main_cit_data = main_cit_data[main_cit_data$main_overall_acc > 0.75,]
-
-main_cit_check$remaining = ifelse(main_cit_check$subject_id %in% main_cit_data$subject_id,
-                                  'remained',
-                                  'excluded')
+main_cit_withdems[main_cit_withdems$remaining == 'excluded',]
 
 # accuracy exclusion
 aggr_neat(
-    dat = main_cit_check,
+    dat = main_cit_withdems,
     values = main_overall_acc,
-    group_by = c('remaining', 'speaker'),
+    group_by = c('remaining', 'l1'),
     method = length
 )
 
-full_data = main_cit_data[main_cit_data$userid != '5e5c077c0d5149000b06c3bb',]
+main_cit_data = main_cit_corrprob
+
+main_cit_data = main_cit_data[main_cit_data$overall_acc_target > 0.4,]
+main_cit_data = main_cit_data[main_cit_data$overall_acc_targetflr > 0.4,]
+main_cit_data = main_cit_data[main_cit_data$overall_acc_nontargflr > 0.6,]
+main_cit_data = main_cit_data[main_cit_data$main_overall_acc > 0.8,]
+
+main_cit_corrprob$remaining = ifelse(main_cit_corrprob$subject_id %in% main_cit_data$subject_id,
+                                  'remained',
+                                  'excluded')
+# accuracy exclusion
+aggr_neat(
+    dat = main_cit_corrprob,
+    values = main_overall_acc,
+    group_by = c('remaining', 'l1'),
+    method = length
+)
+
+full_data = main_cit_data
 
 # demographics
 
-neatStats::dems_neat(full_data, percent = F, group_by = 'speaker')
+neatStats::dems_neat(full_data, percent = F, group_by = 'l1')
+neatStats::dems_neat(full_data, percent = F, group_by = c('alternation'))
+
+# table(full_data$l1, full_data$alternation)
+
+# abs(full_data$dcitph1 - as.numeric(as.character(full_data$dcit1))) < 0.0001
+
 
 # ANALYSIS ----
 
-data_speaker = full_data[full_data$speaker == "yes",]
-data_nonspker = full_data[full_data$speaker == "no",]
+t_neat(
+    full_data$rt_mean_diff_pl[full_data$l1 == 'pl'],
+    full_data$rt_mean_diff_pl[full_data$l1 == 'hu'],
+    auc_added = TRUE,
+    bf_added = FALSE
+)
+t_neat(
+    full_data$rt_mean_diff_hu[full_data$l1 == 'hu'],
+    full_data$rt_mean_diff_hu[full_data$l1 == 'pl'],
+    auc_added = TRUE,
+    bf_added = FALSE
+)
+
+t_neat(
+    c(full_data$rt_mean_diff_hu[full_data$l1 == 'hu'],
+      full_data$rt_mean_diff_pl[full_data$l1 == 'pl']),
+    c(full_data$rt_mean_diff_hu[full_data$l1 == 'pl'],
+      full_data$rt_mean_diff_pl[full_data$l1 == 'hu']),
+    auc_added = TRUE,
+    bf_added = FALSE
+)
 
 
-neatStats::t_neat(data_speaker$rt_mean_probe,
-                  data_speaker$rt_mean_irrelevant,
-                  pair = T)
-
-
-neatStats::t_neat(data_nonspker$rt_mean_probe,
-                  data_nonspker$rt_mean_irrelevant,
-                  pair = T)
-
-neatStats::t_neat(data_speaker$acc_rate_probe,
-                  data_speaker$acc_rate_irrelevant,
-                  pair = T)
-
-neatStats::t_neat(data_speaker$dur_mean_probe,
-                  data_speaker$dur_mean_irrelevant,
-                  pair = T)
-
+# etc
 
 neatStats::plot_neat(
     full_data,
     values = c(
-        'rt_B_mean_diffs_1',
-        'rt_B_mean_diffs_2',
-        'rt_B_mean_diffs_3',
-        'rt_B_mean_diffs_4'
+        'rt_B_mean_diff_4',
+        'rt_B_mean_diff_6',
+        'rt_B_mean_diff_8',
+        'rt_B_mean_diff_10'
     ),
-    between_vars = 'speaker',
+    between_vars = c(),
     reverse = T
 )
 
+
 neatStats::anova_neat(
-    data_speaker,
+    full_data,
     values = c(
-        'rt_B_mean_diffs_1',
-        'rt_B_mean_diffs_2',
-        'rt_B_mean_diffs_3',
-        'rt_B_mean_diffs_4'
-    )
+        'rt_B_mean_diff_4',
+        'rt_B_mean_diff_6',
+        'rt_B_mean_diff_8',
+        'rt_B_mean_diff_10'
+    ),
+    between_vars = c('alternation'),
+    bf_added = FALSE
 )
+
+
+t_neat(
+    full_data$rt_mean_diff_normal[full_data$alternation == 'yes'],
+    full_data$rt_mean_diff_scrambled[full_data$alternation == 'yes'],
+    pair = TRUE, greater = '2'
+)
+
 
 # correlation with LexTALE
 
-neatStats::corr_neat(data_speaker$rt_mean_diffs, data_speaker$lextale, direction = 'p')
+neatStats::corr_neat(full_data$rt_mean_diff, full_data$lextale)
 
 ## AUCS
 

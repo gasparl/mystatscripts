@@ -174,6 +174,12 @@ main_cit_merg$dur_mean_diffs_1 = main_cit_merg$dur_mean_probe_1 -
 main_cit_merg$acc_rate_diffs_1 = main_cit_merg$acc_rate_probe_1 - main_cit_merg$acc_rate_irrelevant_1
 main_cit_merg$main_overall_acc = ((main_cit_merg$overall_acc_probe) + main_cit_merg$overall_acc_irrelevant * 4) / 5
 
+
+sort(main_cit_merg$overall_acc_targetref)
+
+sort(main_cit_merg$main_overall_acc)
+
+
 main_cit_merg$rt_B_mean_diffs_4 = main_cit_merg$rt_B_mean_probe_4 - main_cit_merg$rt_B_mean_irrelevant_4
 main_cit_merg$rt_B_mean_diffs_5 = main_cit_merg$rt_B_mean_probe_5 - main_cit_merg$rt_B_mean_irrelevant_5
 main_cit_merg$rt_B_mean_diffs_8 = main_cit_merg$rt_B_mean_probe_8 - main_cit_merg$rt_B_mean_irrelevant_8
@@ -549,3 +555,4 @@ main_results = table_neat(
 
 
 # write.table(main_results, "main_stats_table.txt", quote = F, row.names = F, sep="\t")
+
