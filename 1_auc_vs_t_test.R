@@ -1,7 +1,6 @@
 library("neatStats")
 library("MASS")
 library("ggpubr")
-library("reshape2")
 library("correlate")
 # note: "correlate" needs to be installed from archived source
 # e.g. install.packages("correlate_1.0.tar.gz", repos = NULL, type="source")
@@ -9,6 +8,7 @@ library("correlate")
 theme_set(theme_pubr())
 
 N = 10000
+set.seed(1)
 
 for (cycl in c(1, 2)) {
     # default values
@@ -27,139 +27,110 @@ for (cycl in c(1, 2)) {
     
         
     ### EFFECT SIZE does not equal MEAN DIFFERENCE
-    # 1a same d but different SD and M (for guilty, with constant innocent) -> different AUC
+    
+    
+    ### 1a same SD, but different CORRELATION (for guilty, with constant innocent)
+    
+    # from 2017 paper:
+    if (cycl == 1) {
+        corrs_g = 0.698
+        corrs_i = (0.698+0.880)/2
+    } else {
+        corrs_g = 0.880
+        corrs_i = (0.698+0.880)/2
+    }
+    
+    # 1b same d but different SD and M (for guilty, with constant innocent) -> different AUC
     
     # from 2020 data, 95% confidence limits
     
-    if (cycl == 1) {
-        sds_prob_g = 43.0
-    } else {
-        sds_prob_g = 49.5
-    }
-    
-    ### 1b same SD, but different CORRELATION
-    
-    # from 2017 paper:
     # if (cycl == 1) {
-    #     corrs_g = 0.698
+    #     sds_prob_g = 43.0
     # } else {
-    #     corrs_g = 0.880
+    #     sds_prob_g = 49.5
     # }
+
 
     means_pi_diff = d_const * sqrt((sds_prob_g ** 2 + sds_irr_g ** 2) - 2 * corrs_g *
                                        sds_prob_g * sds_irr_g)
     means_prob_g = means_irr_g + means_pi_diff
     
     # calculations
-    probes1 = bayestestR::distribution_normal(n = N, mean = means_prob_g, sd = sds_prob_g)
-    irrs1 = bayestestR::distribution_normal(n = N, mean = means_irr_g, sd = sds_irr_g)
-    pi_data = correlate(cbind(probes1, irrs1), corrs_g)
+    stddev <- c(sds_prob_g, sds_irr_g)
+    corMat <- matrix(c(1, corrs_g,
+                       corrs_g, 1),
+                     ncol = 2)
+    covMat <- stddev %*% t(stddev) * corMat
+    
+    pi_data <- mvrnorm(n = N, mu = c(means_prob_g, means_irr_g), Sigma = covMat, empirical = TRUE)
     probes1 = pi_data[, 1]
     irrs1 = pi_data[, 2]
     p_vs_i_1 = probes1 - irrs1
+    #
+    stddev <- c(sds_prob_i, sds_irr_i)
+    corMat <- matrix(c(1, corrs_i,
+                       corrs_i, 1),
+                     ncol = 2)
+    covMat <- stddev %*% t(stddev) * corMat
     
-    probes2 = bayestestR::distribution_normal(n = N, mean = means_prob_i, sd = sds_prob_i)
-    irrs2 = bayestestR::distribution_normal(n = N, mean = means_irr_i, sd = sds_irr_i)
-    pi_data = cbind(probes2, irrs2)
-    pi_data = correlate(pi_data, corrs_i)
+    pi_data <- mvrnorm(n = N, mu = c(means_prob_i, means_irr_i), Sigma = covMat, empirical = TRUE)
     probes2 = pi_data[, 1]
     irrs2 = pi_data[, 2]
     p_vs_i_2 = probes2 - irrs2
     
+    print(" -- GUILTY --")
     t_neat(probes1, irrs1, pair = TRUE)
+    print("INNOCENT")
     t_neat(probes2, irrs2, pair = TRUE)
     
     # plots
     
-    data_dens = data.frame(probes = probes1, irrs = irrs1)
-    data_dens = melt(data_dens)
-    plot_1 = ggplot(data = data_dens, aes(
-        x = value,
-        group = variable,
-        fill = variable
-    )) + geom_density(alpha = 0.4) +
-        theme_bw() +
-        theme(
-            text = element_text(family = "serif"),
-            panel.grid.minor = element_blank(),
-            panel.grid.major = element_blank()
-        ) +
-        geom_vline(
-            xintercept = c(mean(probes1), mean(irrs1), mean(p_vs_i_1)) ,
-            color = "grey",
-            linetype = "dotted",
-            size = 1
-        ) +
-        scale_fill_grey(start = 0.8, end = 0.0)
-    
-    data_dens = data.frame(probes = probes2, irrs = irrs2)
-    data_dens = melt(data_dens)
-    plot_2 = ggplot(data = data_dens, aes(
-        x = value,
-        group = variable,
-        fill = variable
-    )) + geom_density(alpha = 0.4) +
-        theme_bw() +
-        theme(
-            text = element_text(family = "serif"),
-            panel.grid.minor = element_blank(),
-            panel.grid.major = element_blank()
-        ) +
-        geom_vline(
-            xintercept = c(mean(probes2), mean(irrs2), mean(p_vs_i_2)) ,
-            color = "grey",
-            linetype = "dotted",
-            size = 1
-        ) +
-        scale_fill_grey(start = 0.8, end = 0.0)
-    
-    data_dens = data.frame(p_vs_i_1 = p_vs_i_1, p_vs_i_2 = p_vs_i_2)
-    data_dens = melt(data_dens)
-    plot_3 = ggplot(data = data_dens, aes(
-        x = value,
-        group = variable,
-        fill = variable
-    )) + geom_density(alpha = 0.4) +
-        theme_bw() +
-        theme(
-            text = element_text(family = "serif"),
-            panel.grid.minor = element_blank(),
-            panel.grid.major = element_blank()
-        ) +
-        geom_vline(
-            xintercept = c(mean(p_vs_i_1), mean(p_vs_i_2)) ,
-            color = "grey",
-            linetype = "dotted",
-            size = 1
-        ) +
-        scale_fill_grey()
-    
-    t_info = t_neat(p_vs_i_1, p_vs_i_2, auc_added = T)
+    t_info = t_neat(p_vs_i_1, p_vs_i_2, auc_added = T, plots = T)
     
     # ggarrange( plot_1, plot_2, plot_3, labels = c("A", "B", "C"), nrow = 3)
     
     ##
+    limits_x =  c(-100, 150)
+    limits_y = c(0, 0.007)
     if (cycl == 1) {
-        plots_list_1 = list(plot_1, plot_2, plot_3, t_info) # save with first settings
+        fig1 = t_info$t_plot +
+            scale_x_continuous(limits = limits_x,
+                               breaks = seq(-50, 50, by = 50)) + 
+            scale_y_continuous(limits = limits_y) + scale_fill_manual(name = NULL, values = c('#006600', '#b3b3ff'))
+        t_info1 = t_info
     } else {
-        plots_list_2 = list(plot_1, plot_2, plot_3, t_info) # save with second settings
-        theplot = ggarrange(
-            plots_list_1[[1]],
-            plots_list_2[[1]],
-            plots_list_1[[2]],
-            plots_list_2[[2]],
-            plots_list_1[[3]],
-            plots_list_2[[3]],
-            labels = c("A1", "B1", "A2", "B2", "A3", "B3"),
-            ncol = 2,
-            nrow = 3,
-            common.legend = T
-        )
-        t1 = plots_list_1[[4]]
-        t2 = plots_list_2[[4]]
+        fig2 = t_info$t_plot +
+            scale_x_continuous(limits = limits_x,
+                               breaks = seq(-50, 50, by = 50)) + 
+            scale_y_continuous(limits = limits_y) + scale_fill_manual(name = NULL, values = c('#006600', '#b3b3ff'))
+        t_info2 = t_info
         print("---")
-        print(c(t1$stats["d"], t1$stats["auc"], t1$stats["accuracy"]))
-        print(c(t2$stats["d"], t2$stats["auc"], t2$stats["accuracy"]))
+        print(round(c(
+            t_info1$stats["d"], t_info1$stats["auc"], t_info1$stats["accuracy"]
+        ), 3))
+        print(round(c(
+            t_info2$stats["d"], t_info2$stats["auc"], t_info2$stats["accuracy"]
+        ), 3))
+        show(ggpubr::annotate_figure(
+            ggpubr::ggarrange(
+                fig1,
+                fig2,
+                ncol = 1,
+                nrow = 2,
+                common.legend = T,
+                labels = c('A', 'B'),
+                font.label = list(size = 20),
+                hjust = -0.9,
+                vjust = 1
+            ),
+            bottom = ggpubr::text_grob(
+                "probe-irrelevant difference values",
+                hjust = 0.4,
+                vjust = 0.3,
+                size = 16,
+                family = 'serif'
+            )
+        ))
     }
 }
 
