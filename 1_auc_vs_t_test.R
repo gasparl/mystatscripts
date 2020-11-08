@@ -28,17 +28,25 @@ for (cycl in c(1, 2)) {
         
     ### EFFECT SIZE does not equal MEAN DIFFERENCE
     
-    
     ### 1a same SD, but different CORRELATION (for guilty, with constant innocent)
     
-    # from 2017 paper:
+    # from 2020 data:
     if (cycl == 1) {
-        corrs_g = 0.698
-        corrs_i = (0.698+0.880)/2
+        corrs_g = 0.74
+        corrs_i = 0.88
     } else {
-        corrs_g = 0.880
-        corrs_i = (0.698+0.880)/2
+        corrs_g = 0.88
+        corrs_i = 0.88
     }
+    
+    # from 2017 paper:
+    # if (cycl == 1) {
+    #     corrs_g = 0.698
+    #     corrs_i = (0.698+0.880)/2
+    # } else {
+    #     corrs_g = 0.880
+    #     corrs_i = (0.698+0.880)/2
+    # }
     
     # 1b same d but different SD and M (for guilty, with constant innocent) -> different AUC
     
@@ -85,13 +93,17 @@ for (cycl in c(1, 2)) {
     
     # plots
     
-    t_info = t_neat(p_vs_i_1, p_vs_i_2, auc_added = T, plots = T)
+    print(" -- SMD between --")
+    t_info = t_neat(p_vs_i_1, p_vs_i_2, auc_added = T, plots = T,
+                    x_label = NULL,
+                    var_names = c('liar', 'truthteller'),
+                    reverse = F, aspect_ratio = 0.8)
     
     # ggarrange( plot_1, plot_2, plot_3, labels = c("A", "B", "C"), nrow = 3)
     
     ##
     limits_x =  c(-100, 150)
-    limits_y = c(0, 0.007)
+    limits_y = c(0, 0.0047)
     if (cycl == 1) {
         fig1 = t_info$t_plot +
             scale_x_continuous(limits = limits_x,
@@ -124,7 +136,7 @@ for (cycl in c(1, 2)) {
                 vjust = 1
             ),
             bottom = ggpubr::text_grob(
-                "probe-irrelevant difference values",
+                "probe-control difference values",
                 hjust = 0.4,
                 vjust = 0.3,
                 size = 16,

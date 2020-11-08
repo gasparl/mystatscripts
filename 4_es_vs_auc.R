@@ -1,7 +1,7 @@
 library('neatStats')
 library('bayestestR')
 library('ggplot2')
-# library('sn') # for skewness only
+library('sn') # for skewness only
 
 calc_diffs_aucs = function(g_sd_lower,
                            i_sd_lower,
@@ -12,14 +12,12 @@ calc_diffs_aucs = function(g_sd_lower,
                            limits_x =  c(-100, 150),
                            limits_y = c(0, 0.005),
                            smpl = 10000,
+                           samp_rat = 0.5,
                            skewed = FALSE,
                            guilty_gamma = 0,
                            innocent_gamma = 0) {
-    
-    d_const = 1.2
-    
-    m_g_lower = d_const * ( ( (g_sd_lower**2 + i_sd_lower**2)/2  ) **0.5 )
-    m_g_upper = d_const * ( ( (g_sd_upper**2 + i_sd_upper**2)/2  ) **0.5 )
+    m_g_lower =  m_g_avg - m_g_diff / 2
+    m_g_upper = m_g_avg + m_g_diff / 2
     
     # smaller g-i difference but smaller SDs:
     g_1 = distribution_normal(n = smpl, sd = g_sd_lower, mean = m_g_lower)
@@ -29,15 +27,28 @@ calc_diffs_aucs = function(g_sd_lower,
     g_2 = distribution_normal(n = smpl, sd = g_sd_upper, mean = m_g_upper)
     i_2 = distribution_normal(n = smpl, sd = i_sd_upper, mean = 0)
     
+    if (skewed != FALSE) {
+        g_1 = distribution_mixture_normal(
+            n = smpl,
+            sd = g_sd_lower/2,
+            mean = c(m_g_lower*innocent_gamma, m_g_lower*guilty_gamma)
+        )
+        i_1 = distribution_mixture_normal(
+            n = smpl,
+            sd = i_sd_lower,
+            mean = 0
+        )
+    }
+    
     cat('\n1. Smaller guilty-innocent difference but smaller SDs:',
         fill = T)
     cat(
         '- Guilty mean:',
-        m_g_lower,
+        mean(g_1),
         ' Guilty SD:',
-        g_sd_lower,
+        sd(g_1),
         ' Innocent SD:',
-        i_sd_lower,
+        sd(i_1),
         fill = T
     )
     t1 = t_neat(
@@ -48,7 +59,7 @@ calc_diffs_aucs = function(g_sd_lower,
         plots = T,
         x_label = NULL,
         var_names = c('liar', 'truthteller'),
-        reverse = T
+        reverse = F, aspect_ratio = 0.8
     )
     roc1 <<- t1$roc_obj
     fig1 = t1$t_plot +
@@ -60,11 +71,11 @@ calc_diffs_aucs = function(g_sd_lower,
         fill = T)
     cat(
         '- Guilty mean:',
-        m_g_upper,
+        mean(g_2),
         ' Guilty SD:',
-        g_sd_upper,
+        sd(g_2),
         ' Innocent SD:',
-        i_sd_upper,
+        sd(i_2),
         fill = T
     )
     t2 = t_neat(
@@ -75,7 +86,7 @@ calc_diffs_aucs = function(g_sd_lower,
         plots = T,
         x_label = NULL,
         var_names = c('liar', 'truthteller'),
-        reverse = T
+        reverse = F, aspect_ratio = 0.8
     )
     roc2 <<- t2$roc_obj
     fig2 = t2$t_plot  +
@@ -83,14 +94,14 @@ calc_diffs_aucs = function(g_sd_lower,
                            breaks = seq(-50, 50, by = 50)) +
         scale_y_continuous(limits = limits_y) +
         scale_fill_manual(name = NULL, values = c('#006600', '#b3b3ff'))
-
+    
     cat('\nDifferences between two guilty groups:', fill = T)
     t_neat(g_1, g_2, bf_added = F)
-    
+
     show(ggpubr::annotate_figure(
         ggpubr::ggarrange(
-            fig1,
             fig2,
+            fig1,
             ncol = 1,
             nrow = 2,
             common.legend = T,
@@ -100,7 +111,7 @@ calc_diffs_aucs = function(g_sd_lower,
             vjust = 1
         ),
         bottom = ggpubr::text_grob(
-            "probe-irrelevant difference values",
+            "probe-control difference values",
             hjust = 0.4,
             vjust = 0.3,
             size = 16,
@@ -109,26 +120,33 @@ calc_diffs_aucs = function(g_sd_lower,
     ))
     #fx1 <<- fig1
     #fx2 <<- fig2
+    print("---")
+    print(round(c(
+        t1$stats["d"], t1$stats["auc"], t1$stats["accuracy"]
+    ), 3))
+    print(round(c(
+        t2$stats["d"], t2$stats["auc"], t2$stats["accuracy"]
+    ), 3))
 }
 
 # 4 between-subject EFFECT SIZE does not mean ACCURACY
 
-
-
+# 95% CI:
 calc_diffs_aucs(
     g_sd_lower = 33.61352,
-    i_sd_lower = 33.61352/1.311566,
+    i_sd_lower = 23.50483,
     g_sd_upper = 33.61352,
-    i_sd_upper = 33.61352/1.571886
+    i_sd_upper = 23.50483
 )
 
+# skew
 calc_diffs_aucs(
-    g_sd_lower = 20.61352,
-    i_sd_lower = 33.61352/1.311566,
+    g_sd_lower = 60.61352,
+    i_sd_lower = 23.50483,
     g_sd_upper = 33.61352,
-    i_sd_upper = 33.61352/1.571886
+    i_sd_upper = 23.50483
+    , skewed = TRUE, guilty_gamma = 4, innocent_gamma = 0.2
 )
-
 
 
 

@@ -71,7 +71,7 @@ calc_diffs_aucs = function(g_sd_lower,
         plots = T,
         x_label = NULL,
         var_names = c('liar', 'truthteller'),
-        reverse = T
+        reverse = F, aspect_ratio = 0.8
     )
     roc1 <<- t1$roc_obj
     fig1 = t1$t_plot +
@@ -98,7 +98,7 @@ calc_diffs_aucs = function(g_sd_lower,
         plots = T,
         x_label = NULL,
         var_names = c('liar', 'truthteller'),
-        reverse = T
+        reverse = F, aspect_ratio = 0.8
     )
     roc2 <<- t2$roc_obj
     fig2 = t2$t_plot  +
@@ -112,8 +112,8 @@ calc_diffs_aucs = function(g_sd_lower,
     
     show(ggpubr::annotate_figure(
         ggpubr::ggarrange(
-            fig1,
             fig2,
+            fig1,
             ncol = 1,
             nrow = 2,
             common.legend = T,
@@ -123,7 +123,7 @@ calc_diffs_aucs = function(g_sd_lower,
             vjust = 1
         ),
         bottom = ggpubr::text_grob(
-            "probe-irrelevant difference values",
+            "probe-control difference values",
             hjust = 0.4,
             vjust = 0.3,
             size = 16,
@@ -132,6 +132,13 @@ calc_diffs_aucs = function(g_sd_lower,
     ))
     #fx1 <<- fig1
     #fx2 <<- fig2
+    print("---")
+    print(round(c(
+        t1$stats["d"], t1$stats["auc"], t1$stats["accuracy"]
+    ), 3))
+    print(round(c(
+        t2$stats["d"], t2$stats["auc"], t2$stats["accuracy"]
+    ), 3))
 }
 
 # LARGER MEAN DIFFERENCE does not mean larger AUC or accuracy
