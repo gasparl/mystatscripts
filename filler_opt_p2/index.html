@@ -1,0 +1,234 @@
+ <!DOCTYPE html>
+ <html>
+
+ <head>
+     <link rel="icon" type="image/png" href="../webs/lg_logo.png">
+     <title>Language Detection Test</title>
+     <meta charset="UTF-8">
+     <meta name="google" content="notranslate">
+     <meta name="author" content="Gaspar Lukacs">
+     <meta charset="UTF-8">
+     <script src="./js/jquery-2.1.3.min.js" type="text/javascript"></script>
+     <script src="./js/jquery.mb.browser.min.js" type="text/javascript"></script>
+     <script src="./js/utils.js"></script>
+     <script src="./js/cit.js"></script>
+     <script src="./js/item_base.js"></script>
+     <script src="./js/start.js"></script>
+     <link href="./css/styles.css" rel="stylesheet" type="text/css">
+ </head>
+
+ <body class="notranslate">
+
+     <!--  NO DIGGING IN THE CODES! CHEATERS WILL BE REJECTED -->
+     <!--  WE MANUALLY CHECK EACH RESULT DATASET -->
+
+     <div id="div_start_error" style="background:red;color:black;font-size:2.2vw;display:none;position:absolute;z-index:100;opacity:0.8;" onclick="$('#div_start_error').hide()">Connection failed. Please check whether your internet is working, and try
+         refreshing the page. If the problem persists, please contact gaspar.lukacs@univie.ac.at.</div>
+
+     <div id="div_end_error" style="background:red;color:black;font-size:2.2vw;display:none;position:absolute;z-index:100;" onclick="dl_as_file()">Data cannot be saved on the server. <b>Click anywhere on this text to save your data manually.</b>
+         (You must allow pop-ups.) If this is live testing, send the data to lkcsgaspar@gmail.com (or contact in case of further issues).</div>
+
+     <div id="not_chrome_warn" class="intro"></div>
+
+     <div id="not_pid_warn" class="intro">
+         Your <b>Prolific ID is missing</b>! If you are trying to do this test as a job via Prolific, you should open the proper link provided.
+     </div>
+
+     <div id="div_intro_ready" style="line-height:150%;" class="intro">
+         <br><br>
+         In the following test, we will try to reveal whether or not you recognize certain details related to a crime committed yesterday. If you did not participate in the crime, you have nothing to fear. If you participated in the crime – which you
+         are denying – you should try your best to avoid being detected.
+         <br><br>
+
+         Please make sure you have your browser in fullscreen mode (press F11 for Windows, or Control+Cmd+F for Mac), and close the programs (and browser tabs or windows) that you are not currently using. Click START to begin the lie detection
+         test.
+         <br><br><br>
+         <div style="text-align:center">
+             <button class="intro_button" onclick="consent_agreed();">
+                 START
+             </button>
+         </div>
+     </div>
+
+
+     <div id="div_item_rec" style="padding:2%; padding-bottom: 40%; width: 85%; height: 0;" class="maintext">
+
+         Here, you will be presented with certain groups of details. One of these groups is related to the crime you are suspected of. Please read each group of details and confirm that you do not recognize them.
+         <br>
+         <br>
+         <br>
+         <button class="main_button" onclick="okits(this);">
+             OK
+         </button>
+         <div id="its_rec" style="display:none;">
+             <i>
+                 Move your mouse cursor (pointer) over each detail to indicate that you read them. Afterwards, click "I do not recognize these items".
+             </i>
+             <br>
+             <br>
+             <div id="its_group" style="display: block;position: relative;margin: 0 auto; height:10em; width:40em; border: 1px solid gray; font-size:120%;"> </div>
+             <br>
+             <br>
+             <button id="rec_but" style="display: block; margin: 0 auto; font-size:150%;" onclick="next_its();" disabled>
+                 I do not recognize these items
+             </button>
+         </div>
+
+     </div>
+
+     <div id="div_cit_blockstart" style="padding:2%; padding-bottom: 40%; width: 85%; height: 0;" class="maintext">
+         <p id="infotext"></p>
+         <br>
+         <button class="main_button" onclick="runblock()">OK</button>
+         <br>
+         <br>
+         <button class="main_button_instr" id='showfull_id' style="display:none;" onclick="show_again();">show instructions again</button>
+     </div>
+
+     <div id="div_cit_main">
+         <p id="tooslow"><b>Too slow!</b></p>
+         <p id="false"><b>False!</b></p>
+         <p id="stimulus"></p>
+         <p id="start_text">Press the Spacebar to start.</p>
+     </div>
+
+     <div id="scale_div">
+         <br>
+         <h3>The lie detection simulation ends here! You can now answer all our remaining questions truthfully, and there is no more need to deny that you participated in the simulated crime.</h3>
+         <br>
+         Now, first we would like to ask you a few questions.
+         <b>Please be honest!</b>
+         <br><br>
+         <div class="longtext">
+             1. How realistic did you feel the "crime" you had to commit (logging into the webmail, stealing the credit card details)?
+         </div>
+         <br><i>(Click on the slider to choose an answer.)</i>
+         <br>
+         <br>
+         <div class="slidecontainer">
+             <input type="range" min="1" max="5" value="3" class="slider slider_hide_thumb" id="realism_id" onclick='document.getElementById("realism_id").classList.remove("slider_hide_thumb");'>
+             <div class="sliderticks">
+                 <p>Not at all</p>
+                 <p>A little</p>
+                 <p>Fairly</p>
+                 <p>Very</p>
+                 <p>Extremely</p>
+             </div>
+         </div>
+         <br>
+         <br>
+         <div class="longtext">
+             2. Did you feel anxious about about committing the "crime"?
+         </div>
+         <br><i>(Click on the slider to choose an answer.)</i>
+         <br>
+         <br>
+         <div class="slidecontainer">
+             <input type="range" min="1" max="5" value="3" class="slider slider_hide_thumb" id="anx_id" onclick='document.getElementById("anx_id").classList.remove("slider_hide_thumb");'>
+             <div class="sliderticks">
+                 <p>Not at all</p>
+                 <p>A little</p>
+                 <p>Fairly</p>
+                 <p>Very</p>
+                 <p>Extremely</p>
+             </div>
+         </div>
+         <br>
+         <br>
+         <div class="longtext">
+             3. How excited were you about whether you succeed at concealing your knowledge about the "incriminating" details (i.e., "beating" the lie detection test)?
+         </div>
+         <br><i>(Click on the slider to choose an answer.)</i>
+         <br>
+         <br>
+         <div class="slidecontainer">
+             <input type="range" min="1" max="5" value="3" class="slider slider_hide_thumb" id="excit_id" onclick='document.getElementById("excit_id").classList.remove("slider_hide_thumb");'>
+             <div class="sliderticks">
+                 <p>Not at all</p>
+                 <p>A little</p>
+                 <p>Fairly</p>
+                 <p>Very</p>
+                 <p>Extremely</p>
+             </div>
+         </div>
+         <br>
+         <br>
+         <div class="longtext">
+             4. It is important that you pay attention to the instructions; click anywhere on the slider below three separate times.
+         </div>
+         <br>
+         <div id="attdiv">
+             <i>(Click on the slider to choose an answer.)</i>
+             <br>
+             <br>
+             <div class="slidecontainer">
+                 <input type="range" min="1" max="5" value="3" class="slider slider_hide_thumb" id="attcheck_id" onclick='attchecks();'>
+                 <div class="sliderticks">
+                     <p>Not at all</p>
+                     <p>A little</p>
+                     <p>Fairly</p>
+                     <p>Very</p>
+                     <p>Extremely</p>
+                 </div>
+             </div>
+         </div>
+         <br>
+         <br>
+         <button class="intro_button" onclick="change_div(this, '#div_outro_check');window.scrollTo(0, 0);" style="font-size:2.5vw;">OK</button>
+         <br>
+     </div>
+
+
+     <div id="div_outro_check" style="font-size:2.1vw;max-width:90%;" class="intro">
+         <p>
+             Below you see four groups of words you had to categorize in the tests. Each group contains one of the "incriminating" details from the simulated crime (the account name, the PIN, the bank name, and the webmail username). We of course
+             know that you in fact took part in the crime-simulation (which was your assigned experimental group), but <b>it is very important for our research to know whether you actually still remember all these details</b>. Therefore, <b>please
+                 select the one crime-related information in each group</b>. If you really cannot remember at all, just select "I don't know".
+         </p>
+         <div class="row">
+             <div id="div_pcheck10" class="column">
+             </div>
+             <div id="div_pcheck11" class="column">
+             </div>
+         </div>
+         <div class="row">
+             <div id="div_pcheck12" class="column">
+             </div>
+             <div id="div_pcheck13" class="column">
+             </div>
+         </div>
+         <br>
+         <br>
+         <button class="intro_button" onclick="final_probe_check();" style="font-size:2.5vw;">OK</button>
+     </div>
+
+     <div id="div_outro_end" style="width: 75%;font-size:2.0vw;" class="intro">
+         <b>This is the end of the experiment, thank you for participating!</b>
+         <br>
+         <br>Once again, rest assured that you did not commit any real crime, and the credit card details were all fictional. <b>However, please do remember that you must not share any of the details from our tasks with anyone within the next two
+             months (unless with our explicit written permission)!</b>
+         <br>
+         <br> Short info about this test:
+         <br> Our key assumption is that those who actually "stole" the credit card details, and hence recognized these among the other details, tend to (very shortly) hesitate when responding to these items, and therefore will have slower responses
+         to these than to the other items. Based on this response time difference, we can distinguish participants who actually committed the simulated crime from those who did not. <br>
+         Apart from assessing whether this really works (and hence might be applied in similar real situations), we also compare the results of different participants who performed slightly different tasks, to see which works best for lie detection.
+         This concerns the addition of certain "filler" items in the task that had been found to further slow down responses to the critical details and thereby make distinguishing those who recognize the details even better (see e.g. <a
+             href="https://doi.org/10.1002/acp.3565" target="_blank">here</a>). In the
+         current study, these fillers were presented in various proportions for each participant, and they consisted of various types of items (numbers, symbols, or meaningful words), and all these different conditions will be compared to each other.
+         For even more details, you can contact gaspar.lukacs@univie.ac.at.
+         <br>
+         <div id="passw_container">
+             <b>
+                 <br>
+                 Use the following Prolific link to verify your completed participation:
+                 <br>
+                 <span style="color:red" id="passw_display"></span>
+                 <br>
+             </b>
+             <br>
+         </div>
+     </div>
+
+ </body>
+
+ </html>

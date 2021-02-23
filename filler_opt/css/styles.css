@@ -1,0 +1,309 @@
+#html_id {
+    background: #666666;
+}
+select{font-family:inherit;font-size:calc(100% - 0.1vw);}
+input{font-family:inherit;font-size:calc(100% - 0.1vw);}
+.intro {
+    border-radius: 0.2vw;
+    font-size:1.5vw;
+    font-family:Helvetica;
+    width: 95%;
+    background-color: #cccccc;
+    margin: 0 auto;
+    padding: 2%;
+    text-align: justify;
+    display:none;
+    position: relative;
+}
+
+.intro_button {
+    -moz-box-shadow:inset 0vw 0.1vw 0vw 0vw #B0B0B0;
+    -webkit-box-shadow:inset 0vw 0.1vw 0vw 0vw #B0B0B0;
+    box-shadow:inset 0vw 0.1vw 0vw 0vw #B0B0B0;
+    background-color:#a6a6a6;
+    border-radius:0.1vw;
+    border:0.1vw solid #dcdcdc;
+    cursor:pointer;
+    color:#000000;
+    font-size: 1.8vw;
+    font-family:Helvetica;
+    font-weight:bold;
+    padding:0.6vw 2.4vw;
+    text-decoration:none;
+    text-shadow:0vw 0.1vw 0vw #C0C0C0;
+    position:relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.intro_button:hover {
+    background-color:#8c8c8c;
+}
+.maintext {
+    font-family: Helvetica;
+    border-radius: 0.4vw;
+    height: 0;
+    width: 50%;
+    padding-bottom: 20%;
+    margin: 0;
+    position: absolute;
+    text-align: left;
+    font-size: 1.5vw;
+    top: 50%;
+    left: 50%;
+    margin-right: -50%;
+    transform: translate(-50%, -50%);
+    padding-left: 5%;
+    padding-right: 5%;
+    padding-top: 5%;
+    background: #FFFFFF;
+    display:none;
+}
+
+.main_instr {
+    font-family: Helvetica;
+    border-radius: 0.4vw;
+    width: 94%;
+    position: relative;
+    text-align: justify;
+    font-size: 1.5vw;
+    padding-bottom: 3%;
+    padding-left: 3%;
+    padding-right: 3%;
+    padding-top: 3%;
+    background: #FFFFFF;
+    display:none;
+    left: 50%;
+    transform: translateX(-50%)
+}
+.main_button {
+    -webkit-border-radius: 5;
+    -moz-border-radius: 5;
+    border-radius: 5%;
+    font-family: Helvetica;
+    color: #e6e6e6;
+    background: #333333;
+    font-size: 2.2vw;
+    padding: 1.5%;
+    text-decoration: none;
+    position:relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.main_button:hover {
+    background: #1a1a1a;
+    text-decoration: none;
+}
+.main_button_instr {
+    -webkit-border-radius: 5;
+    -moz-border-radius: 5;
+    border-radius: 5%;
+    font-family: Helvetica;
+    color: #e6e6e6;
+    background: #595959;
+    font-size: 1.8vw;
+    padding-bottom: 0.3%;
+    padding-left: 2%;
+    padding-right: 2%;
+    padding-top: 0.3%;
+    text-decoration: none;
+    position:relative;
+    left: 50%;
+    transform: translateX(-50%);
+}
+.main_button_instr:hover {
+    background: #262626;
+    text-decoration: none;
+}
+#start_text {
+  text-align: center;
+  font-size: 3vw;
+  width: 70%;
+  position: fixed;
+  margin: 0;
+  top: 88%;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  color: #ff0000;
+}
+#stimulus {
+  font-size: 3vw;
+  font-family: Arial !important;
+  text-align: center;
+  color: #FFFFFF;
+  font-weight: bolder;
+  position: absolute;
+  width: 90%;
+  top: 50%;
+  left: 50%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#label_top {
+  text-align: center;
+  font-size: 2.5vw;
+  width: 60%;
+  position: fixed;
+  margin: 0;
+  top: 20%;
+  left: 50%;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#label_left {
+  width: 30%;
+  text-align: center;
+  font-size: 2.25vw;
+  position: fixed;
+  top: 75%;
+  left: 20%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#label_right {
+  width: 30%;
+  text-align: center;
+  font-size: 2.25vw;
+  position: fixed;
+  top: 75%;
+  left: 80%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#tooslow {
+  width: 30%;
+  color: #ff080a;
+  text-align: center;
+  font-size: 4.0vw;
+  position: fixed;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+  display: none;
+  left: 50%;
+  top: 60%;
+}
+#false {
+  width: 30%;
+  color: #ff080a;
+  text-align: center;
+  font-size: 4.0vw;
+  position: fixed;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+  display: block;
+  left: 50%;
+  top: 20%;
+  left: 50%;
+  top: 60%;
+  display: none;
+}
+#div_cit_main {
+    font-family: "Arial";
+    color: #FFFFFF;
+    display:none;
+}
+.words0 {
+  text-transform: capitalize;
+  font-size: 1.7vw;
+  cursor: pointer;
+  width: 24%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+  left: 20%;
+  text-align: center;
+}
+.words1 {
+  text-transform: capitalize;
+  font-size: 1.7vw;
+  cursor: pointer;
+  width: 15%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+  left: 48%;
+  text-align: center;
+}
+.words2 {
+  text-transform: capitalize;
+  font-size: 1.7vw;
+  cursor: pointer;
+  width: 15%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  position: absolute;
+  left: 75%;
+  text-align: center;
+}
+.words0.turnedon {
+  font-weight: bold;
+}
+.words1.turnedon {
+  font-weight: bold;
+}
+.words2.turnedon {
+  font-weight: bold;
+}
+#lex_word {
+  font-size: 4vw;
+  font-family: Arial !important;
+  text-align: center;
+  color: #000000;
+  font-weight: bolder;
+  position: absolute;
+  width: 90%;
+  top: 40%;
+  left: 50%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#lex_label_left {
+  width: 30%;
+  text-align: center;
+  font-size: 2.25vw;
+  position: fixed;
+  top: 70%;
+  left: 20%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#lex_label_right {
+  width: 30%;
+  text-align: center;
+  font-size: 2.25vw;
+  position: fixed;
+  top: 70%;
+  left: 80%;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+}
+#lex_tooslow {
+  width: 55%;
+  color: #ff080a;
+  text-align: center;
+  font-size: 2.0vw;
+  position: fixed;
+  margin: 0;
+  margin-right: -50%;
+  transform: translate(-50%, -50%);
+  font-family: "Lucida Sans Unicode", "Lucida Grande", sans-serif;
+  left: 50%;
+  top: 55%;
+}
+#div_intro_lex_task {
+    font-family: "Arial";
+    display:none;
+}
