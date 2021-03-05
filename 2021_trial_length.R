@@ -30,6 +30,7 @@ plot_items = ggplot(data = trials_guilty, aes(x = trial_number, y = rt)) +
   scale_fill_manual(values = colrs)
 
 
+
 ####
 plot_items
 pltdat <- ggplot_build(plot_items)[['data']][[1]]
