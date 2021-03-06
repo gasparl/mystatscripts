@@ -56,7 +56,7 @@ for (dset in enum(unique(main_preds$dataset))) {
     meta_dat,
     dataset = set_preds$dataset[1],
     study = set_preds$study[1],
-    cit_type = set_preds$cit_type[1],
+    cit_type = set_preds$multiple_single[1],
     rt_diff,
     rt_diff_h1,
     rt_diff_h2,
@@ -69,7 +69,27 @@ for (dset in enum(unique(main_preds$dataset))) {
   )
 }
 
-meta_dat$sd_rt_diff_h1_1
+
+meta_dat$cit_type[meta_dat$cit_type == 1] = '(MP)'
+meta_dat$cit_type[meta_dat$cit_type == 0] = '(SP)'
+meta_dat$cit_type[meta_dat$cit_type == 2] = '(SPF)'
+meta_dat$title = paste(meta_dat$dataset, meta_dat$study,  meta_dat$cit_type)
+meta_dat$title = gsub('Exp', 'Exp. ', meta_dat$title)
+meta_dat$title = gsub('Geven, Ben-Shakhar, Kindt, & Verschuere',
+                      'Geven et al.',
+                      meta_dat$title)
+meta_dat$title = gsub('Lukács, Kleinberg, & Verschuere',
+                      'Lukács et al.',
+                      meta_dat$title)
+meta_dat$title = gsub('Verschuere, Kleinberg, & Theocharidou',
+                      'Verschuere, Kleinberg, et al.',
+                      meta_dat$title)
+meta_dat$title = gsub('Kleinberg & Verschuere',
+                      'Kleinberg et al.',
+                      meta_dat$title)
+meta_dat$title = gsub('Noordraven & Verschuere',
+                      'Noordraven et al.',
+                      meta_dat$title)
 
 meta_dat <-
   escalc(
@@ -77,35 +97,26 @@ meta_dat <-
     m1i = m_rt_diff_h1_1,
     m2i = m_rt_diff_h2_1,
     sd1i = sd_rt_diff_h1_1,
-    ni = sd_rt_diff_h2_1,
+    sd2i = sd_rt_diff_h2_1,
+    ni = n_g,
     ri = r_h12,
     data = meta_dat,
     slab = dataset
   )
-
-meta_dat$cit_type[meta_dat$cit_type == 1] = 'MP'
-meta_dat$cit_type[meta_dat$cit_type == 0] = 'SP'
-meta_dat$cit_type[meta_dat$cit_type == 2] = 'SPF'
-
-meta_dat$crowdsourced = "Yes"
-meta_dat$crowdsourced[grepl( "Noordraven & Verschuere", meta_dat$study )] = "No"
-meta_dat$crowdsourced[grepl( "Verschuere & Kleinberg (2015)", meta_dat$study, fixed = T )] = "No"
-
-REML_multi <-
-  rma(
-    yi,
-    vi,
-    data = meta_dat,
-    method = "REML",
-    mods = ~ relevel(factor(cit_type), ref = "SP") + crowdsourced #, level = 0.9
-  )
-REML_multi
-
 res = rma(yi, vi, data = meta_dat)
-forest(res)
+res
 
+forest(res,
+       slab = meta_dat$title,
+       fonts = 'serif', #showweight=TRUE,
+       xlim = c(1.7,-3))
 
-# funnel(res)
+plot_neat(
+  meta_dat,
+  values = c(
+    'm_rt_diff_h1_1', 'm_rt_diff_h2_1'
+  ),  between_vars = 'dataset'
+)
 
 # AUCS
 
