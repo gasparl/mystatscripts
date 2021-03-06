@@ -107,7 +107,7 @@ res = rma(yi, vi, data = meta_dat)
 res
 
 forest(res,
-       slab = meta_dat$title,
+       slab = meta_dat$title, mlab = 'Random Effects Model for All Studies',
        fonts = 'serif', #showweight=TRUE,
        xlim = c(1.7,-3))
 
@@ -159,3 +159,4 @@ ggplot2::ggplot(data = fig_dat, aes(x = dataset,
     legend.position = "bottom",
     text = element_text(family = "serif", size = 17)
   )
+

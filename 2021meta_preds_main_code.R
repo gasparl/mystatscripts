@@ -124,3 +124,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
 
 # saveRDS(all_predicts, "half_predictors_meta.rds")
 # saveRDS(metdat, "half_aucs_meta.rds")
+
+# ##
+# saveRDS(all_predicts, "half4_predictors_meta.rds")
+# saveRDS(metdat, "half4_aucs_meta.rds")
