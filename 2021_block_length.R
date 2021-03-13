@@ -105,18 +105,60 @@ meta_dat <-
   )
 res = rma(yi, vi, data = meta_dat)
 res
+confint(res)
+#predict(res, digits=3)
 
 forest(res,
        slab = meta_dat$title, mlab = 'Random Effects Model for All Studies',
        fonts = 'serif', #showweight=TRUE,
        xlim = c(1.7,-3))
 
-plot_neat(
+# FIG
+#
+twocolrs = viridis::viridis(2, end = 0.5)
+fig_dat = stats::reshape(
   meta_dat,
-  values = c(
-    'm_rt_diff_h1_1', 'm_rt_diff_h2_1'
-  ),  between_vars = 'dataset'
+  direction = 'long',
+  varying = c("m_rt_diff_h1_1", "m_rt_diff_h2_1"),
+  idvar = c("dataset"),
+  timevar = "version",
+  v.names = "rt_diff",
+  times = c("m_rt_diff_h1_1", "m_rt_diff_h2_1"),
 )
+fig_dat$ci_dist = ifelse(
+  fig_dat$version == 'm_rt_diff_h1_1',
+  meta_dat$sd_rt_diff_h1_1 /
+    sqrt(meta_dat$n_g) * stats::qnorm(0.975),
+  meta_dat$sd_rt_diff_h2_1 /
+    sqrt(meta_dat$n_g) * stats::qnorm(0.975)
+)
+
+fig_dat$version[fig_dat$version == 'm_rt_diff_h1_1'] = 'First half'
+fig_dat$version[fig_dat$version == 'm_rt_diff_h2_1'] = 'Second half'
+fig_dat$dataset = as.factor(fig_dat$dataset)
+ggplot2::ggplot(data = fig_dat, aes(x = dataset,
+                                    y = rt_diff,
+                                    fill = version)) +
+  geom_bar(stat = "identity",
+           color = "black",
+           position = position_dodge(0.9)) +
+  scale_fill_manual(values = c(twocolrs[1], twocolrs[2]),name = NULL) +
+  geom_errorbar(aes(
+    ymin = fig_dat$rt_diff - fig_dat$ci_dist,
+    ymax = fig_dat$rt_diff + fig_dat$ci_dist,
+    width = 0.2
+  ),
+  position = position_dodge(0.9)) + theme_bw() +
+  theme(panel.grid.major.x = element_blank())  +
+  ylab("Probe-Control RT Difference") +
+  xlab("Dataset (individual experimental design)") +
+  theme(
+    panel.grid.major.y = element_line(color = "#d5d5d5"),
+    panel.grid.minor.y = element_line(color = "#d5d5d5"),
+    legend.position = "bottom",
+    text = element_text(family = "serif", size = 17)
+  )
+
 
 # AUCS
 
@@ -126,7 +168,7 @@ aggr_neat(aucs, values = "accuracies", group_by = c("version"), method = 'mean+s
 t_neat(aucs$aucs[aucs$version == 'pred_all'],
        aucs$aucs[aucs$version == 'pred_1'], pair = T)
 
-twocolrs = viridis::viridis(2, end = 0.5)
+# AUC fig
 fig_dat = aucs[aucs$version %in% c("pred_all", "pred_1"), c("version", "dataset", "aucs", "auc_lower", "auc_upper")]
 fig_dat$version[fig_dat$version == 'pred_1'] = 'First half'
 fig_dat$version[fig_dat$version == 'pred_2'] = 'Second half'
