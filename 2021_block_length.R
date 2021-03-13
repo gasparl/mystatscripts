@@ -133,29 +133,48 @@ fig_dat$ci_dist = ifelse(
     sqrt(meta_dat$n_g) * stats::qnorm(0.975)
 )
 
+dodge = 0.2
 fig_dat$version[fig_dat$version == 'm_rt_diff_h1_1'] = 'First half'
 fig_dat$version[fig_dat$version == 'm_rt_diff_h2_1'] = 'Second half'
 fig_dat$dataset = as.factor(fig_dat$dataset)
-ggplot2::ggplot(data = fig_dat, aes(x = dataset,
-                                    y = rt_diff,
-                                    fill = version)) +
-  geom_bar(stat = "identity",
-           color = "black",
-           position = position_dodge(0.9)) +
-  scale_fill_manual(values = c(twocolrs[1], twocolrs[2]),name = NULL) +
-  geom_errorbar(aes(
-    ymin = fig_dat$rt_diff - fig_dat$ci_dist,
-    ymax = fig_dat$rt_diff + fig_dat$ci_dist,
-    width = 0.2
-  ),
-  position = position_dodge(0.9)) + theme_bw() +
+ggplot2::ggplot(data = fig_dat, aes(
+  x = dataset,
+  y = rt_diff,
+  group = version,
+  color = version
+)) +
+  geom_errorbar(
+    aes(
+      ymin = fig_dat$rt_diff - fig_dat$ci_dist,
+      ymax = fig_dat$rt_diff + fig_dat$ci_dist,
+      width = 0.2,
+      color = version
+    ), alpha = 0.5,
+    color = '#333333',
+    position = position_dodge(dodge)
+  ) +
+  geom_errorbar(
+    aes(
+      ymin = fig_dat$rt_diff - fig_dat$ci_dist,
+      ymax = fig_dat$rt_diff + fig_dat$ci_dist,
+      width = 0.2,
+      color = version
+    ), alpha = 0.5,
+    position = position_dodge(dodge)
+  )  +
+  geom_line(position = position_dodge(dodge)) +
+  geom_point(aes(shape = version),
+             position = position_dodge(dodge))  +
+  scale_shape_discrete() +
+  scale_linetype_discrete() +
+  scale_color_manual(values = twocolrs) + theme_bw() +
   theme(panel.grid.major.x = element_blank())  +
   ylab("Probe-Control RT Difference") +
   xlab("Dataset (individual experimental design)") +
   theme(
     panel.grid.major.y = element_line(color = "#d5d5d5"),
     panel.grid.minor.y = element_line(color = "#d5d5d5"),
-    legend.position = "bottom",
+    legend.position = "bottom", legend.title = element_blank(),
     text = element_text(family = "serif", size = 17)
   )
 
