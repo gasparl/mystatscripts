@@ -16,7 +16,7 @@ pids = function(idvec, filt) {
 
 setwd(path_neat("results"))
 procsv_names = list.files(pattern = "^prolific_export_.*csv$")
-# procsv_names = list.files(pattern = "prolific_export_602929f77da1f34a6069612f.csv")
+# procsv_names = list.files(pattern = "prolific_export_604dd28241e7742d7168803c.csv")
 
 # allrts = read_dir(
 #   '\\.txt$',
@@ -208,7 +208,7 @@ for (f_name in enum(file_names)) {
 
 main_cit_prep = main_cit_merg
 
-pids(main_cit_prep$userid[main_cit_prep$condition == 5], filt = dems_pro$userid)
+#pids(main_cit_prep$userid, filt = dems_pro$userid)
 
 
 for (colname in names(main_cit_prep)) {
@@ -257,16 +257,45 @@ full_data = main_cit_data # [main_cit_data$subject_id != 'REN_20200905210301',]
 
 # demographics
 
-neatStats::dems_neat(full_data, group_by = 'filler_type')
+neatStats::dems_neat(full_data, group_by = 'filler_type', percent = T)
+
+# Initital (opened second part)
+# verbal 129+141 = 270
+# signal 133+129 = 262
+# mixed 134+136 = 270
+
+
+
+# full_data[is.na(full_data$Sex),]
+
+# conds_done = 25 - table(paste0(full_data$condition, full_data$subcond))
+# condlist = c()
+# for (fullcond in names(conds_done)) {
+#   numbs = conds_done[fullcond]
+#   if (numbs < 0) {
+#     numbs = 0
+#   }
+#   condlist = c(condlist, rep(fullcond, numbs))
+# }
+# table(condlist)
+# clipr::write_clip(paste(condlist, collapse = "','"))
 
 # ANALYSIS ----
 
+facts = c('signal', 'mixed', 'verbal')
+full_data$filler_type = factor(full_data$filler_type, levels = facts, labels = facts)
+
 neatStats::plot_neat(
   full_data,
-  values = c(
-    'rt_mean_diff_yes',
-    'rt_mean_diff_no'
-  ), between_vars = 'filler_type'
+  #eb_method = sd,
+  values = c('rt_mean_diff_yes',
+             'rt_mean_diff_no'),
+  between_vars = 'filler_type',
+  value_names = c(
+    signal = ' Nonverbal',
+    mixed = 'Mixed',
+    verbal = 'Verbal'
+  )
 )
 
 neatStats::anova_neat(
@@ -274,20 +303,31 @@ neatStats::anova_neat(
   values = c(
     'rt_mean_diff_yes',
     'rt_mean_diff_no'
-  ), between_vars = 'filler_type', bf_added = T
+  ), between_vars = 'filler_type', bf_added = F, norm_tests = "all", norm_plots = T
 )
 
-
-t_neat(
-  full_data$rt_mean_diff_yes,
-  full_data$rt_mean_diff_no,
-  pair = T, plots = T, bf_added = T
+neatStats::anova_neat(
+  full_data[full_data$filler_type != 'verbal',],
+  values = c(
+    'rt_mean_diff_yes',
+    'rt_mean_diff_no'
+  ), between_vars = 'filler_type', bf_added = F
 )
+
+neatStats::anova_neat(
+  full_data[full_data$filler_type != 'signal',],
+  values = c(
+    'rt_mean_diff_yes',
+    'rt_mean_diff_no'
+  ), between_vars = 'filler_type'
+)
+
+#
 
 t_neat(
   full_data$rt_mean_diff_yes[full_data$filler_type == 'mixed'],
   full_data$rt_mean_diff_no[full_data$filler_type == 'mixed'],
-  pair = T, plots = T, bf_added = T
+  pair = T, plots = T, bf_added = F
 )
 
 t_neat(
@@ -296,11 +336,20 @@ t_neat(
   plots = T, bf_added = T
 )
 t_neat(
+  full_data$rt_mean_diff_yes[full_data$filler_type == 'mixed'],
+  full_data$rt_mean_diff_yes[full_data$filler_type == 'verbal'],
+  plots = T, bf_added = F
+)
+# t_neat(
+#   full_data$rt_mean_diff_no[full_data$filler_type == 'mixed'],
+#   full_data$rt_mean_diff_no[full_data$filler_type == 'verbal'],
+#   plots = T, bf_added = T
+# )
+t_neat(
   full_data$rt_mean_diff[full_data$filler_type == 'mixed'],
   full_data$rt_mean_diff[full_data$filler_type == 'signal'],
-  plots = T, bf_added = T
+  plots = T, bf_added = T#, nonparametric = T
 )
-
 
 neatStats::plot_neat(
   full_data,
@@ -327,8 +376,27 @@ neatStats::plot_neat(
   values = c(
     'rt_mean_diff_yes',
     'rt_mean_diff_no'
-  ), between_vars = c('filler_type', "firstcond")
+  ), between_vars = c('filler_type', "firstcond"),
+  value_names = c(
+    signal = ' Nonverbal',
+    mixed = 'Mixed',
+    verbal = 'Verbal'
+  )
 )
+
+
+data_ntfills = full_data[full_data$firstcond == "yes", ]
+t_neat(
+  data_ntfills$rt_mean_diff_yes[data_ntfills$filler_type == 'mixed'],
+  data_ntfills$rt_mean_diff_yes[data_ntfills$filler_type == 'verbal'],
+  bf_added = F
+)
+t_neat(
+  data_ntfills$rt_mean_diff_yes[data_ntfills$filler_type == 'mixed'],
+  data_ntfills$rt_mean_diff_yes[data_ntfills$filler_type == 'signal'],
+  bf_added = F
+)
+
 neatStats::plot_neat(
   full_data[full_data$nonverbals != 'none',],
   values = c(
@@ -400,6 +468,27 @@ neatStats::t_neat(
   bf_added = F,
   auc_added = T
 )
+
+full_data$amount = as.numeric(as.character(full_data$amount))
+corr_neat(full_data$rt_mean_diff,full_data$amount)
+
+library('ggplot2')
+ggplot2::ggplot(full_data, aes(
+  x = amount,
+  y = rt_mean_diff, group = filler_type
+)) +
+  theme_bw() +
+  geom_point(shape = 3,
+             size = 3, color = "#009900") +
+  geom_smooth(
+    method = loess,
+    fullrange = TRUE,
+    level = .95,
+    color = "#bb0000",
+    fill = "#9999ff",
+    size = 0.7
+  ) +
+  scale_x_log10()
 
 # write.table(full_data, "results_aggregated_exp2_index_vs_thumb.txt", quote = F, row.names = F, sep="\t")
 
