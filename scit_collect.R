@@ -160,5 +160,5 @@ for(f_name in enum(file_names)) {
 }
 
 full_merged$stim_type =  sub('irrelevant', 'control', full_merged$stim_type)
-saveRDS(full_merged, "scit_filler_meta.rds")
+# saveRDS(full_merged, "scit_filler_meta.rds")
 
