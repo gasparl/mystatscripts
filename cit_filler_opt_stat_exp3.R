@@ -7,12 +7,6 @@ lofence = function(numvec) {
   # return(3 * (quantile_3rd - quantile_1st) + quantile_3rd)
   return(quantile_1st - 3 * (quantile_3rd - quantile_1st))
 }
-pids = function(idvec, filt = NULL) {
-  if (is.null(filt)) {
-    filt = idvec
-  }
-  clipr::write_clip(paste(as.character(idvec[idvec %in% filt]), collapse = ","))
-}
 
 sim_auc = function(preds) {
   neatStats::t_neat(
@@ -27,10 +21,7 @@ sim_auc = function(preds) {
 
 # COLLECT DATA ----
 
-setwd(path_neat("results_exp2"))
-procsv_names = list.files(pattern = "^prolific_export_.*csv$")
-#procsv_names = list.files(pattern = "prolific_export_606ff18b94d7b72e5d6a5ac4.csv")
-
+setwd(path_neat("results_exp3"))
 # allrts = read_dir(
 #   '\\.txt$',
 #   header = TRUE,
@@ -40,37 +31,6 @@ procsv_names = list.files(pattern = "^prolific_export_.*csv$")
 #   stringsAsFactors = FALSE, hush = FALSE
 # )
 
-dems_pro = data.frame()
-for (demname in procsv_names) {
-    # demname = "prolific_export_5ea41a55095de0010be51c51.csv"
-    print(demname)
-    dems_table = read.table(
-        demname,
-        sep = ",",
-        header = TRUE,
-        fill = TRUE,
-        quote = "\"",
-        stringsAsFactors = FALSE
-    )
-
-    dems_table = dems_table[dems_table$status == "APPROVED" | dems_table$status == "AWAITING REVIEW",
-                            c(
-                                "participant_id",
-                                "time_taken",
-                                "age",
-                                "prolific_score",
-                                "Country.of.Birth",
-                                "Current.Country.of.Residence",
-                                "Employment.Status",
-                                "First.Language",
-                                "Sex",
-                                "Student.Status"
-                            )]
-    dems_pro =  plyr::rbind.fill(dems_pro, dems_table)
-}
-colnames(dems_pro)[1] = "userid"
-
-# duplicated(dems_pro$userid)
 
 file_names = list.files(pattern = "^fill_opt.*txt$")
 
@@ -95,30 +55,19 @@ for (f_name in enum(file_names)) {
     dems_dat = strsplit(dems_row[[3]], "/")[[1]]
     dems = do.call(rbind.data.frame, list(dems_dat))
     colnames(dems) = dems_heads
-    if (dems$variety == 'regular') {
-      dems$variety = 'regular3'
-    }
 
     subj_data$stim_type[grepl('^irrelevant', subj_data$stim_type)] = "irrelevant"
 
     subj_itms_base = subj_data[subj_data$phase == 'main', ]
     # subj_itms_base = subj_data[subj_data$phase == 'main' & subj_data$trial_number <= 81, ]
 
-    firstc = subj_itms_base$proportion[1]
-    if (firstc == 'constant_r') {
-      subj_itms_base$proportion = 'regular'
-      if (nrow(subj_itms_base) != 162*4) {
-        # just double-check
-        print("number of rows:")
-        print(nrow(subj_itms_base))
-        stop("trial num incorrect: ", nrow(subj_itms_base))
-      }
-    } else if (nrow(subj_itms_base) != 162*4-16*2) {
-        # just double-check
-        print("number of rows:")
-        print(nrow(subj_itms_base))
-        stop("trial num incorrect: ", nrow(subj_itms_base))
+    if (nrow(subj_itms_base) != 162*4) {
+      # just double-check
+      print("number of rows:")
+      print(nrow(subj_itms_base))
+      stop("trial num incorrect: ", nrow(subj_itms_base))
     }
+
 
     subj_itms_base$valid_trial = ifelse(
         subj_itms_base$incorrect == 0 &
@@ -155,7 +104,7 @@ for (f_name in enum(file_names)) {
       dat = subj_itms_base,
       values = valid_trial,
       method = mean,
-      group_by = c("stim_type", "proportion"),
+      group_by = c("stim_type", "variety"),
       filt = (rt_start >= 150),
       prefix = "acc_rate"
     )
@@ -182,7 +131,7 @@ for (f_name in enum(file_names)) {
       dat = subj_itms_base,
       values = rt_start,
       method = mean,
-      group_by = c("stim_type", "proportion"),
+      group_by = c("stim_type", "variety"),
       filt = (rt_start >= 150 & valid_trial == 1),
       prefix = "rt_mean"
     )
@@ -194,32 +143,23 @@ for (f_name in enum(file_names)) {
         group_by = c("stim_type"),
         prefix = "overall_acc"
     )
-    neatStats::aggr_neat(
-      dat = subj_itms_base,
-      values = valid_trial,
-      method = mean,
-      group_by = c("category"),
-      prefix = "overall_acc"
-    )
-
-
-    overall_acc_filler = aggr_neat(
-      dat = subj_itms_base,
-      values = valid_trial,
-      method = mean,
-      filt = (category == 'filler')
-    )$aggr_value
     overall_acc_main = aggr_neat(
       dat = subj_itms_base,
       values = valid_trial,
       method = mean,
       filt = (stim_type %in% c('irrelevant', 'probe'))
     )$aggr_value
+    overall_acc_filler = aggr_neat(
+      dat = subj_itms_base,
+      values = valid_trial,
+      method = mean,
+      filt = (category == 'filler')
+    )$aggr_value
 
     rbind_loop(
       main_cit_merg,
       dems,
-      firstcond = firstc,
+      firstcond = subj_itms_base$variety[1],
       subj_acc_rates,
       subj_acc_rate_cats,
       subj_acc_rate_nts,
@@ -253,31 +193,22 @@ for (colname in names(main_cit_prep)) {
   }
 }
 
-main_cit_prep = merge(main_cit_prep, dems_pro, by = "userid", all = TRUE)
-
-main_cit_prep$probe_correct = as.numeric(as.character(main_cit_prep$probe_correct))
-
-main_cit_data = excl_neat(
-  main_cit_prep,
-  (
-    main_cit_prep$probe_correct > 2
-  )
-)
+main_cit_data = main_cit_prep
 
 # peek_neat(grp_dat, 'overall_acc_main')
 # peek_neat(grp_dat, 'overall_acc_target')
 # peek_neat(grp_dat, 'overall_acc_filler')
 
-for (grp in unique(main_cit_data$variety)) {
+for (grp in unique(main_cit_data$filler_type)) {
   cat(grp, fill = TRUE)
-  grp_dat = main_cit_data[main_cit_data$variety == grp, ]
+  grp_dat = main_cit_data[main_cit_data$filler_type == grp, ]
   main_cit_data = excl_neat(
     main_cit_data,
     (
       overall_acc_main >= lofence(grp_dat$overall_acc_main) &
         overall_acc_target >= lofence(grp_dat$overall_acc_target) &
         overall_acc_filler >= lofence(grp_dat$overall_acc_filler)
-    ) | main_cit_data$variety != grp
+    ) | main_cit_data$filler_type != grp
   )
 }
 
@@ -286,15 +217,13 @@ full_data = main_cit_data # [main_cit_data$subject_id != 'REN_20200905210301',]
 # demographics
 
 neatStats::dems_neat(full_data, group_by = 'condition', percent = T)
-neatStats::dems_neat(full_data, group_by = 'variety', percent = T)
+neatStats::dems_neat(full_data, group_by = 'filler_type', percent = T)
 
-data_batch1 = full_data[full_data$firstcond != 'constant_r',]
-neatStats::dems_neat(data_batch1, group_by = c('variety', 'firstcond'), percent = T)
 
 # Initital (opened second part)
 # varied 160+157 = 317
 # regular 158+149 = 307
-# neatStats::dems_neat(main_cit_prep, group_by = 'variety', percent = T)
+# neatStats::dems_neat(main_cit_prep, group_by = 'filler_type', percent = T)
 
 # Dropout rates (varied, regular)
 # print((c(317, 307) - c(305,294)) / c(317, 307) )
@@ -317,103 +246,92 @@ neatStats::dems_neat(data_batch1, group_by = c('variety', 'firstcond'), percent 
 # ANALYSIS ----
 
 
-######## FIRST BATCH
 
 neatStats::plot_neat(
-  data_batch1,
+  full_data,
   #eb_method = sd,
-  values = c('rt_mean_diff_lesstargs',
+  values = c('rt_mean_diff_varied',
              'rt_mean_diff_regular'),
-  between_vars = c('variety', 'nonverbals'),
-  #between_vars = c('variety', 'firstcond'),
+  #between_vars = c('filler_type'),
+  between_vars = c('firstcond'),
   value_names = c(
-    varied = 'Six fillers',
-    regular3 = 'Three fillers',
-    lesstargs = 'First: reduced target-side',
-    regular = 'First: regular target-side',
-    rt_mean_diff_lesstargs = 'Reduced target-side',
-    rt_mean_diff_regular = 'Regular target-side'
+    regular = 'First: three fillers',
+    varied = 'First: six fillers',
+    rt_mean_diff_varied = 'Six fillers',
+    rt_mean_diff_regular = 'Three fillers'
   ), y_title = 'Probe-Control RT Differences'
 )
 
-
 neatStats::anova_neat(
-  data_batch1,
-  values = c('rt_mean_diff_lesstargs',
+  full_data,
+  values = c('rt_mean_diff_varied',
              'rt_mean_diff_regular'),
-  between_vars = c('variety'),
+  between_vars = c('filler_type'),
   bf_added = F,
   plot_means = T
 )
 
 t_neat(
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'varied'],
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'regular3'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'varied'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'regular3'],
   plots = F, greater = '1',
   bf_added = T#, nonparametric = T
 )
 
 t_neat(
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'varied' &
-                                   data_batch1$firstcond == 'regular'],
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'regular3' &
-                                   data_batch1$firstcond == 'regular'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'varied' &
+                                   full_data$firstcond == 'regular'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'regular3' &
+                                   full_data$firstcond == 'regular'],
   plots = F,
   greater = '1',
   bf_added = T#, nonparametric = T
 )
 
 t_neat(
-  data_batch1$rt_mean_diff_lesstargs[data_batch1$variety == 'regular3'],
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'regular3'],
+  full_data$rt_mean_diff_varied[full_data$filler_type == 'regular3'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'regular3'],
   plots = F, greater = '1', pair = T,
   bf_added = T#, nonparametric = T
 )
 
 t_neat(
-  data_batch1$rt_mean_diff_lesstargs[data_batch1$variety == 'varied'],
-  data_batch1$rt_mean_diff_regular[data_batch1$variety == 'varied'],
+  full_data$rt_mean_diff_varied[full_data$filler_type == 'varied'],
+  full_data$rt_mean_diff_regular[full_data$filler_type == 'varied'],
   plots = F, greater = '1', pair = T,
   bf_added = T#, nonparametric = T
 )
 
+# ORDER
 
-####### FULL DATA
 
-t_neat(
-  full_data$rt_mean_diff_regular[full_data$variety == 'varied'],
-  full_data$rt_mean_diff_regular[full_data$variety == 'regular3'],
-  plots = T,
-  greater = '1',
-  bf_added = T, #nonparametric = T
+full_data$rt_mean_diff_1st = ifelse(
+  full_data$firstcond == 'varied',
+  full_data$rt_mean_diff_varied,
+  full_data$rt_mean_diff_regular
+)
+full_data$rt_mean_diff_2nd = ifelse(
+  full_data$firstcond == 'regular',
+  full_data$rt_mean_diff_regular,
+  full_data$rt_mean_diff_varied
 )
 
-t_neat(
-  full_data$rt_mean_diff_regular[full_data$variety == 'varied' &
-                                   full_data$firstcond != 'lesstargs'],
-  full_data$rt_mean_diff_regular[full_data$variety == 'regular3' &
-                                   full_data$firstcond != 'lesstargs'],
-  plots = F,
-  greater = '1',
-  bf_added = T#, nonparametric = T
-)
-
-# numbers vs. arrows
 
 neatStats::plot_neat(
   full_data,
   #eb_method = sd,
-  values = c('rt_mean_diff_regular'),
-  between_vars = c('variety', 'nonverbals', 'firstcond'),
+  values = c('rt_mean_diff_1st',
+             'rt_mean_diff_2nd'),
+  between_vars = c('firstcond'),
+  #between_vars = c('filler_type', 'firstcond'),
   value_names = c(
-    varied = 'Six fillers',
-    regular3 = 'Three fillers',
-    lesstargs = 'First: reduced target-side',
-    regular = 'First: regular target-side',
-    rt_mean_diff_lesstargs = 'Reduced target-side',
-    rt_mean_diff_regular = 'Regular target-side'
+    rt_mean_diff_varied = 'Six fillers',
+    rt_mean_diff_regular = 'Three fillers'
   ), y_title = 'Probe-Control RT Differences'
 )
+
+
+# numbers vs. arrows
 
 t_neat(
   full_data$rt_mean_diff_regular[full_data$nonverbals == 'numbers'],
@@ -425,51 +343,29 @@ t_neat(
 
 t_neat(
   full_data$rt_mean_diff_regular[full_data$nonverbals == 'numbers' &
-                                   full_data$variety == 'varied' &
-                                   full_data$firstcond != 'lesstargs'],
+                                   full_data$filler_type == 'varied' &
+                                   full_data$firstcond != 'varied'],
   full_data$rt_mean_diff_regular[full_data$nonverbals == 'arrows' &
-                                   full_data$variety == 'varied' &
-                                   full_data$firstcond != 'lesstargs'],
+                                   full_data$filler_type == 'varied' &
+                                   full_data$firstcond != 'varied'],
   plots = F,
   greater = '1',
   bf_added = T#, nonparametric = T
 )
 
-# other
-
-
-neatStats::plot_neat(
-  full_data,
-  values = c(
-    'rt_mean_diff_banks',
-    'rt_mean_diff_names',
-    'rt_mean_diff_nicks',
-    'rt_mean_diff_pins'
-  ), between_vars = 'variety', reverse = T, eb_method = sd
-)
-neatStats::plot_neat(
-  full_data,
-  values = c(
-    'rt_mean_diff_banks',
-    'rt_mean_diff_names',
-    'rt_mean_diff_nicks',
-    'rt_mean_diff_pins'
-  ), between_vars = 'nonverbals', reverse = T, eb_method = sd
-)
-
 
 # SIMS
 
-sim_auc(data_batch1$rt_mean_diff_lesstargs)
-sim_auc(data_batch1$rt_mean_diff_regular)
+sim_auc(full_data$rt_mean_diff_varied)
+sim_auc(full_data$rt_mean_diff_regular)
 
-sim_auc(full_data$rt_mean_diff[full_data$variety == 'varied'])
-sim_auc(full_data$rt_mean_diff[full_data$variety == 'regular3'])
+sim_auc(full_data$rt_mean_diff[full_data$filler_type == 'varied'])
+sim_auc(full_data$rt_mean_diff[full_data$filler_type == 'regular3'])
 
-sim_auc(full_data$rt_mean_diff[full_data$variety == 'varied' &
-                                 full_data$firstcond != 'lesstargs'])
-sim_auc(full_data$rt_mean_diff[full_data$variety == 'regular3' &
-                                 full_data$firstcond != 'lesstargs'])
+sim_auc(full_data$rt_mean_diff[full_data$filler_type == 'varied' &
+                                 full_data$firstcond != 'varied'])
+sim_auc(full_data$rt_mean_diff[full_data$filler_type == 'regular3' &
+                                 full_data$firstcond != 'varied'])
 
 
 
@@ -497,24 +393,6 @@ corr_neat(rat_data$rt_mean_diff, rat_data$r_excitement, nonparametric = TRUE)
 
 full_data$amount = as.numeric(as.character(full_data$amount))
 corr_neat(full_data$rt_mean_diff,full_data$amount)
-
-library('ggplot2')
-ggplot2::ggplot(full_data, aes(
-  x = amount,
-  y = rt_mean_diff, group = variety
-)) +
-  theme_bw() +
-  geom_point(shape = 3,
-             size = 3, color = "#009900") +
-  geom_smooth(
-    method = loess,
-    fullrange = TRUE,
-    level = .95,
-    color = "#bb0000",
-    fill = "#9999ff",
-    size = 0.7
-  ) +
-  scale_x_log10()
 
 # write.table(full_data, "results_aggregated_exp2_index_vs_thumb.txt", quote = F, row.names = F, sep="\t")
 

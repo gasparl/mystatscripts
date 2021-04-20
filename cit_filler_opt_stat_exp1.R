@@ -187,13 +187,13 @@ for (f_name in enum(file_names)) {
       prefix = "overall_acc"
     )
 
-    overall_acc_main = aggr_neat(
+    overall_acc_filler = aggr_neat(
       dat = subj_itms_base,
       values = valid_trial,
       method = mean,
       filt = (category == 'filler')
     )$aggr_value
-    overall_acc_filler = aggr_neat(
+    overall_acc_main = aggr_neat(
       dat = subj_itms_base,
       values = valid_trial,
       method = mean,
@@ -453,7 +453,7 @@ neatStats::anova_neat(
   values = c(
     'rt_mean_diff_yes',
     'rt_mean_diff_no'
-  ), between_vars = c( "nonverbals"), plot_means = T
+  ), between_vars = c( "nonverbals", 'firstcond'), plot_means = T
 )
 
 # SIMS
@@ -483,6 +483,8 @@ peek_neat(rat_data, 'r_realism')
 peek_neat(rat_data, 'r_excitement')
 
 corr_neat(rat_data$rt_mean_diff, rat_data$r_anxiety, nonparametric = TRUE)
+corr_neat(rat_data$rt_mean_diff, rat_data$r_realism, nonparametric = TRUE)
+corr_neat(rat_data$rt_mean_diff, rat_data$r_excitement, nonparametric = TRUE)
 
 peek_neat(rat_data, 'rt_mean_diff', 'r_anxiety')
 ggpubr::ggscatter(rat_data, 'r_anxiety', 'rt_mean_diff')
