@@ -63,8 +63,8 @@ sed = function (v1, v2) {
 }
 
 
-getrtdiffs = function(datf, prefx = '') {
-  datf = datf[datf$valid_trial == 1 &&
+getrtdiffs = function(datf) {
+  datf = datf[datf$valid_trial == 1 &
                 datf$type %in% c('probe', 'irrelevant'), ]
   prob = datf$rt[datf$type == 'probe']
   irr = datf$rt[datf$type == 'irrelevant']
@@ -77,14 +77,11 @@ getrtdiffs = function(datf, prefx = '') {
   }
   perstim$rtmean = as.numeric(perstim$rtmean)
   perstim$scaled = scale(perstim$rt)
-  return(setNames(c(
-    mean(prob) - mean(irr),
-    (mean(prob) - mean(irr)) / sd(irr),
-    mean(perstim$scaled[perstim$type == "probe"])
-  ),
-  paste0(
-    prefx, c("rt_diff", "rt_dcit", "rt_scaled")
-  )))
+  return(c(
+    rt_diff = mean(prob) - mean(irr),
+    rt_dcit = (mean(prob) - mean(irr)) / sd(irr),
+    rt_scaled = mean(perstim$scaled[perstim$type == "probe"])
+  ))
 }
 
 get_sd_info = function(fulprep_dat, preds_list, study, study_num) {
@@ -205,30 +202,39 @@ dat_prep = function(id,
           prefix = "rt_mean"
         )
 
-      halfnum = (max(subj_itms_base$trial) - min(subj_itms_base$trial)) / 2
-      h1 = getrtdiffs(subj_itms_base[subj_itms_base$trial < halfnum,])
-      h2 = getrtdiffs(subj_itms_base[subj_itms_base$trial < halfnum,])
-
-      maxblock = nrow(subj_itms_base) %/% 100
       subj_itms_base$type = as.character(subj_itms_base$type)
 
+      halfnum = (max(subj_itms_base$trial) - min(subj_itms_base$trial)) / 2
+      half1 = getrtdiffs(subj_itms_base[subj_itms_base$trial < halfnum,])
+      half2 = getrtdiffs(subj_itms_base[subj_itms_base$trial >= halfnum,])
+
+      maxblock = nrow(subj_itms_base) %/% 100
+
+      st_blocked_rt_diffs = c()
+      st_blocked_rt_dcits = c()
+      st_blocked_rt_scaleds = c()
       for (blocknum in 1:maxblock) {
         if (blocknum == maxblock) {
-          df_block = subj_itms_base[(blocknum * 100 - 99):nrow(subj_itms_base),]
+          df_block = subj_itms_base[(blocknum * 100 - 99):nrow(subj_itms_base), ]
         } else {
-          df_block = subj_itms_base[(blocknum * 100 - 99):(blocknum * 100),]
+          df_block = subj_itms_base[(blocknum * 100 - 99):(blocknum * 100), ]
         }
-        print(blocknum)
+        thediffs = getrtdiffs(df_block)
+        st_blocked_rt_diffs = c(st_blocked_rt_diffs, thediffs['rt_diff'])
+        st_blocked_rt_dcits = c(st_blocked_rt_dcits, thediffs['rt_dcit'])
+        st_blocked_rt_scaleds = c(st_blocked_rt_scaleds, thediffs['rt_scaled'])
       }
-
-      %%%%getrtdiffs(df_block, 'hey')
-
       rbind_loop(main_cit_merg,
                  basics,
                  subj_acc_rates,
                  subj_rt_mean,
-                 subj_rt_mean1,
-                 subj_rt_mean2,
+                 st_half_rt_diff = (half1['rt_diff'] + half2['rt_diff']) / 2,
+                 st_half_rt_dcit = (half1['rt_dcit'] + half2['rt_dcit']) / 2,
+                 st_half_rt_scaled = (half1['rt_scaled'] + half2['rt_scaled']) / 2,
+                 st_blocked_rt_diff = mean(st_blocked_rt_diffs),
+                 st_blocked_rt_dcit = mean(st_blocked_rt_dcits),
+                 st_blocked_rt_scaled = mean(st_blocked_rt_scaleds),
+                 overall_acc_allmain = mean(subj_itms_base$valid_trial[subj_itms_base$type %in% c('probe', 'irrelevant')]),
                  overall_acc)
     } else {
       rbind_loop(main_cit_merg,
@@ -246,25 +252,7 @@ auc_ci = function(auc_obj, which_ci, ci = 0.95) {
   pROC::ci.auc(auc_obj, conf.level = ci)[which_ci]
 }
 
-effectsize_data = function(id,
-                           pred_all,
-                           pred_1,
-                           pred_2,
-                           cond,
-                           multiple_single,
-                           study,
-                           sd_sim) {
-  Data_Real <-
-    tibble (
-      id = id,
-      pred_all = pred_all,
-      pred_1 = pred_1,
-      pred_2 = pred_2,
-      cond = cond,
-      multiple_single = multiple_single,
-      study = study
-    )
-
+effectsize_data = function(Data_Real) {
   testData_Real <<- Data_Real
   # Data_Real = testData_Real
 
@@ -276,91 +264,157 @@ effectsize_data = function(id,
            multiple_single)
   study <- Data_Real$study[1]
 
-  pred_all_d <-
-    cohen_d_between(Data_Real$pred_all, Data_Real$cond)
+  d_rt_mean_diff = cohen_d_between(Data_Real$rt_mean_diff, Data_Real$cond)
+  d_st_half_rt_diff = cohen_d_between(Data_Real$st_half_rt_diff, Data_Real$cond)
+  d_st_half_rt_dcit = cohen_d_between(Data_Real$st_half_rt_dcit, Data_Real$cond)
+  d_st_half_rt_scaled = cohen_d_between(Data_Real$st_half_rt_scaled, Data_Real$cond)
+  d_st_blocked_rt_diff = cohen_d_between(Data_Real$st_blocked_rt_diff, Data_Real$cond)
+  d_st_blocked_rt_dcit = cohen_d_between(Data_Real$st_blocked_rt_dcit, Data_Real$cond)
+  d_st_blocked_rt_scaled = cohen_d_between(Data_Real$st_blocked_rt_scaled, Data_Real$cond)
 
-  pred_1_d <-
-    cohen_d_between(Data_Real$pred_1, Data_Real$cond)
-  pred_2_d <-
-    cohen_d_between(Data_Real$pred_2, Data_Real$cond)
+  sed_rt_mean_diff = sed(Data_Real$rt_mean_diff[Data_Real$cond == 1],
+                         Data_Real$rt_mean_diff[Data_Real$cond == 0])
+  sed_st_half_rt_diff = sed(Data_Real$st_half_rt_diff[Data_Real$cond == 1],
+                            Data_Real$st_half_rt_diff[Data_Real$cond == 0])
+  sed_st_half_rt_dcit = sed(Data_Real$st_half_rt_dcit[Data_Real$cond == 1],
+                            Data_Real$st_half_rt_dcit[Data_Real$cond == 0])
+  sed_st_half_rt_scaled = sed(Data_Real$st_half_rt_scaled[Data_Real$cond == 1],
+                              Data_Real$st_half_rt_scaled[Data_Real$cond == 0])
+  sed_st_blocked_rt_diff = sed(Data_Real$st_blocked_rt_diff[Data_Real$cond == 1],
+                               Data_Real$st_blocked_rt_diff[Data_Real$cond == 0])
+  sed_st_blocked_rt_dcit = sed(Data_Real$st_blocked_rt_dcit[Data_Real$cond == 1],
+                               Data_Real$st_blocked_rt_dcit[Data_Real$cond == 0])
+  sed_st_blocked_rt_scaled = sed(Data_Real$st_blocked_rt_scaled[Data_Real$cond == 1],
+                                 Data_Real$st_blocked_rt_scaled[Data_Real$cond == 0])
 
-
-  pred_all_sed = sed(Data_Real$pred_all[Data_Real$cond == 1],
-                     Data_Real$pred_all[Data_Real$cond == 0])
-  pred_1_sed = sed(Data_Real$pred_1[Data_Real$cond == 1],
-                   Data_Real$pred_1[Data_Real$cond == 0])
-  pred_2_sed = sed(Data_Real$pred_2[Data_Real$cond == 1],
-                   Data_Real$pred_2[Data_Real$cond == 0])
-
-
-  pred_all_auc = t_neat(
-    Data_Real$pred_all[Data_Real$cond == 1],
-    Data_Real$pred_all[Data_Real$cond == 0],
-    auc_added = TRUE,
-    bf_added = FALSE, hush = TRUE
+  auc_rt_mean_diff = t_neat(Data_Real$rt_mean_diff[Data_Real$cond == 1],
+                            Data_Real$rt_mean_diff[Data_Real$cond == 0],
+                            auc_added = TRUE,
+                            bf_added = FALSE, hush = TRUE)
+  auc_st_half_rt_diff = t_neat(Data_Real$st_half_rt_diff[Data_Real$cond == 1],
+                               Data_Real$st_half_rt_diff[Data_Real$cond == 0],
+                               auc_added = TRUE,
+                               bf_added = FALSE, hush = TRUE)
+  auc_st_half_rt_dcit = t_neat(Data_Real$st_half_rt_dcit[Data_Real$cond == 1],
+                               Data_Real$st_half_rt_dcit[Data_Real$cond == 0],
+                               auc_added = TRUE,
+                               bf_added = FALSE, hush = TRUE)
+  auc_st_half_rt_scaled = t_neat(Data_Real$st_half_rt_scaled[Data_Real$cond == 1],
+                                 Data_Real$st_half_rt_scaled[Data_Real$cond == 0],
+                                 auc_added = TRUE,
+                                 bf_added = FALSE, hush = TRUE)
+  auc_st_blocked_rt_diff = t_neat(Data_Real$st_blocked_rt_diff[Data_Real$cond == 1],
+                                  Data_Real$st_blocked_rt_diff[Data_Real$cond == 0],
+                                  auc_added = TRUE,
+                                  bf_added = FALSE, hush = TRUE)
+  auc_st_blocked_rt_dcit = t_neat(Data_Real$st_blocked_rt_dcit[Data_Real$cond == 1],
+                                  Data_Real$st_blocked_rt_dcit[Data_Real$cond == 0],
+                                  auc_added = TRUE,
+                                  bf_added = FALSE, hush = TRUE)
+  auc_st_blocked_rt_scaled = t_neat(Data_Real$st_blocked_rt_scaled[Data_Real$cond == 1],
+                                    Data_Real$st_blocked_rt_scaled[Data_Real$cond == 0],
+                                    auc_added = TRUE,
+                                    bf_added = FALSE, hush = TRUE)
+  #
+  the_versions = c(
+    'rt_mean_diff',
+    'st_half_rt_diff',
+    'st_half_rt_dcit',
+    'st_half_rt_scaled',
+    'st_blocked_rt_diff',
+    'st_blocked_rt_dcit',
+    'st_blocked_rt_scaled'
   )
 
-  pred_1_auc = t_neat(Data_Real$pred_1[Data_Real$cond == 1],
-                      Data_Real$pred_1[Data_Real$cond == 0],
-                      auc_added = TRUE, hush = TRUE,
-                      bf_added = FALSE)
-
-  pred_2_auc = t_neat(Data_Real$pred_2[Data_Real$cond == 1],
-                      Data_Real$pred_2[Data_Real$cond == 0],
-                      auc_added = TRUE, hush = TRUE,
-                      bf_added = FALSE)
-  #
-
-  the_versions = c("pred_all", "pred_1", "pred_2")
 
   output <-
     tibble(
-      cohens_d = c(-as.numeric(pred_all_d[1]),
-                   -as.numeric(pred_1_d[1]),
-                   -as.numeric(pred_2_d[1])),
-      variance_d = c(as.numeric(pred_all_d[2]),
-                     as.numeric(pred_1_d[2]),
-                     as.numeric(pred_2_d[2])),
+      cohens_d = c(-as.numeric(d_rt_mean_diff[1]),
+                   -as.numeric(d_st_half_rt_diff[1]),
+                   -as.numeric(d_st_half_rt_dcit[1]),
+                   -as.numeric(d_st_half_rt_scaled[1]),
+                   -as.numeric(d_st_blocked_rt_diff[1]),
+                   -as.numeric(d_st_blocked_rt_dcit[1]),
+                   -as.numeric(d_st_blocked_rt_scaled[1])),
+      variance_d = c(as.numeric(d_rt_mean_diff[2]),
+                     as.numeric(d_st_half_rt_diff[2]),
+                     as.numeric(d_st_half_rt_dcit[2]),
+                     as.numeric(d_st_half_rt_scaled[2]),
+                     as.numeric(d_st_blocked_rt_diff[2]),
+                     as.numeric(d_st_blocked_rt_dcit[2]),
+                     as.numeric(d_st_blocked_rt_scaled[2])),
       version = the_versions,
       multiple_single = rep(multiple_single, length(the_versions)),
       study = rep(study, length(the_versions)),
-      sed = c(pred_all_sed,
-              pred_1_sed,
-              pred_2_sed),
+      sed = c(sed_rt_mean_diff,
+              sed_st_half_rt_diff,
+              sed_st_half_rt_dcit,
+              sed_st_half_rt_scaled,
+              sed_st_blocked_rt_diff,
+              sed_st_blocked_rt_dcit,
+              sed_st_blocked_rt_scaled),
       aucs = c(
-        as.numeric(pred_all_auc$stats['auc']),
-        as.numeric(pred_1_auc$stats['auc']),
-        as.numeric(pred_2_auc$stats['auc'])
+        as.numeric(auc_rt_mean_diff$stats['auc']),
+        as.numeric(auc_st_half_rt_diff$stats['auc']),
+        as.numeric(auc_st_half_rt_dcit$stats['auc']),
+        as.numeric(auc_st_half_rt_scaled$stats['auc']),
+        as.numeric(auc_st_blocked_rt_diff$stats['auc']),
+        as.numeric(auc_st_blocked_rt_dcit$stats['auc']),
+        as.numeric(auc_st_blocked_rt_scaled$stats['auc'])
       ),
       auc_lower = c(
-        auc_ci(pred_all_auc$roc_obj, 1),
-        auc_ci(pred_1_auc$roc_obj, 1),
-        auc_ci(pred_2_auc$roc_obj, 1)
+        auc_ci(auc_rt_mean_diff$roc_obj, 1),
+        auc_ci(auc_st_half_rt_diff$roc_obj, 1),
+        auc_ci(auc_st_half_rt_dcit$roc_obj, 1),
+        auc_ci(auc_st_half_rt_scaled$roc_obj, 1),
+        auc_ci(auc_st_blocked_rt_diff$roc_obj, 1),
+        auc_ci(auc_st_blocked_rt_dcit$roc_obj, 1),
+        auc_ci(auc_st_blocked_rt_scaled$roc_obj, 1)
       ),
       auc_upper = c(
-        auc_ci(pred_all_auc$roc_obj, 3),
-        auc_ci(pred_1_auc$roc_obj, 3),
-        auc_ci(pred_2_auc$roc_obj, 3)
+        auc_ci(auc_rt_mean_diff$roc_obj, 3),
+        auc_ci(auc_st_half_rt_diff$roc_obj, 3),
+        auc_ci(auc_st_half_rt_dcit$roc_obj, 3),
+        auc_ci(auc_st_half_rt_scaled$roc_obj, 3),
+        auc_ci(auc_st_blocked_rt_diff$roc_obj, 3),
+        auc_ci(auc_st_blocked_rt_dcit$roc_obj, 3),
+        auc_ci(auc_st_blocked_rt_scaled$roc_obj, 3)
       ),
       accuracies = c(
-        as.numeric(pred_all_auc$stats['youden'] + 1) / 2,
-        as.numeric(pred_1_auc$stats['youden'] + 1) / 2,
-        as.numeric(pred_2_auc$stats['youden'] + 1) / 2
+        as.numeric(auc_rt_mean_diff$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_half_rt_diff$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_half_rt_dcit$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_half_rt_scaled$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_blocked_rt_diff$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_blocked_rt_dcit$stats['youden'] + 1) / 2,
+        as.numeric(auc_st_blocked_rt_scaled$stats['youden'] + 1) / 2
       ),
       thresholds = c(
-        as.numeric(pred_all_auc$best_thresholds['threshold']),
-        as.numeric(pred_1_auc$best_thresholds['threshold']),
-        as.numeric(pred_2_auc$best_thresholds['threshold'])
+        as.numeric(auc_rt_mean_diff$best_thresholds['threshold']),
+        as.numeric(auc_st_half_rt_diff$best_thresholds['threshold']),
+        as.numeric(auc_st_half_rt_dcit$best_thresholds['threshold']),
+        as.numeric(auc_st_half_rt_scaled$best_thresholds['threshold']),
+        as.numeric(auc_st_blocked_rt_diff$best_thresholds['threshold']),
+        as.numeric(auc_st_blocked_rt_dcit$best_thresholds['threshold']),
+        as.numeric(auc_st_blocked_rt_scaled$best_thresholds['threshold'])
       ),
       TNs = c(
-        as.numeric(pred_all_auc$best_thresholds['specificity']),
-        as.numeric(pred_1_auc$best_thresholds['specificity']),
-        as.numeric(pred_2_auc$best_thresholds['specificity'])
+        as.numeric(auc_rt_mean_diff$best_thresholds['specificity']),
+        as.numeric(auc_st_half_rt_diff$best_thresholds['specificity']),
+        as.numeric(auc_st_half_rt_dcit$best_thresholds['specificity']),
+        as.numeric(auc_st_half_rt_scaled$best_thresholds['specificity']),
+        as.numeric(auc_st_blocked_rt_diff$best_thresholds['specificity']),
+        as.numeric(auc_st_blocked_rt_dcit$best_thresholds['specificity']),
+        as.numeric(auc_st_blocked_rt_scaled$best_thresholds['specificity'])
       ),
       TPs = c(
-        as.numeric(pred_all_auc$best_thresholds['sensitivity']),
-        as.numeric(pred_1_auc$best_thresholds['sensitivity']),
-        as.numeric(pred_2_auc$best_thresholds['sensitivity'])
+        as.numeric(auc_rt_mean_diff$best_thresholds['sensitivity']),
+        as.numeric(auc_st_half_rt_diff$best_thresholds['sensitivity']),
+        as.numeric(auc_st_half_rt_dcit$best_thresholds['sensitivity']),
+        as.numeric(auc_st_half_rt_scaled$best_thresholds['sensitivity']),
+        as.numeric(auc_st_blocked_rt_diff$best_thresholds['sensitivity']),
+        as.numeric(auc_st_blocked_rt_dcit$best_thresholds['sensitivity']),
+        as.numeric(auc_st_blocked_rt_scaled$best_thresholds['sensitivity'])
       )
     )
   return(output)

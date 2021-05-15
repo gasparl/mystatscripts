@@ -21,6 +21,8 @@ compare = readRDS("half_predictors_meta.rds")
 
 cit_trials = cit_trials[cit_trials$subject_id %in% compare$id,]
 
+
+
 # dat9 = trials_guilty[trials_guilty$dataset == 'dataset 9',]
 # for (sid in unique(dat9$subject_id)) {
 #   subj = dat9[dat9$subject_id == sid, ]
@@ -45,15 +47,25 @@ cit_trials = excl_neat(cit_trials, (correct == 1), group_by = 'dataset')
 uniqs = unique(cit_trials$dataset)
 cit_trials$dataset = factor(cit_trials$dataset, levels = uniqs[order(nchar(uniqs), uniqs)])
 
+# trials_full = cit_trials
+# trials_full$valid_trial = trials_full$correct
+# trials_full$guilt = ifelse(cit_trials$outcome == 1, 'guilty', 'innocent')
+# trials_full$item_type[trials_full$item_type == 'irrelevant'] = 'control'
+# trials_full$item_type = factor(trials_full$item_type, levels = c('probe', 'control', 'target'))
+# names(trials_full)[names(trials_full) == 'rt'] = 'rt_start'
+# names(trials_full)[names(trials_full) == 'item_type'] = 'stim_type'
 
+# saveRDS(trials_full, 'meta_all_trials.rds')
 
 trials_guilty = cit_trials[cit_trials$outcome == 1,]
 trials_guilty$item_type[trials_guilty$item_type == 'irrelevant'] = 'control'
 trials_guilty$item_type = factor(trials_guilty$item_type, levels = c('probe', 'control', 'target'))
 
+# saveRDS(trials_guilty, 'meta_guilty_trials.rds')
+
 colrs = viridis::viridis(3, end = 0.85)
 plot_items = ggplot(data = trials_guilty, aes(x = trial_number, y = rt)) +
-  geom_smooth(aes(color = item_type, fill = item_type, weight = ), ) +
+  geom_smooth(aes(color = item_type, fill = item_type)) +
   facet_wrap(vars(dataset)) +
   theme_bw() + theme(strip.background = element_blank(), plot.title = element_text(hjust = 0.5),
         strip.text = element_text(face = 'plain', size = 12), legend.position = "bottom",

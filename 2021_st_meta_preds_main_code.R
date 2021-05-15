@@ -91,21 +91,8 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   }
 
   dat_i_prep$rt_mean_diff = dat_i_prep$rt_mean_probe - dat_i_prep$rt_mean_irrelevant
-  dat_i_prep$rt_mean_h1_diff = dat_i_prep$rt_mean_h1_probe - dat_i_prep$rt_mean_h1_irrelevant
-  dat_i_prep$rt_mean_h2_diff = dat_i_prep$rt_mean_h2_probe - dat_i_prep$rt_mean_h2_irrelevant
-
   # Get the cohens d and stuff
-  eff_data <-
-      effectsize_data(
-          dat_i_prep$id,
-          dat_i_prep$rt_mean_diff,
-          dat_i_prep$rt_mean_h1_diff,
-          dat_i_prep$rt_mean_h2_diff,
-          dat_i_prep$cond,
-          dat_i_prep$multiple_single,
-          dat_i_prep$study,
-          sd_i
-      )
+  eff_data <- effectsize_data(dat_i_prep)
 
   met_dat_i = eff_data
   met_dat_i$dataset = datnum
@@ -122,9 +109,7 @@ for (i in dsets[order(nchar(dsets), dsets)]) {
   cat("finished", i, ": ", study_i, fill = T)
 }
 
-# saveRDS(all_predicts, "half_predictors_meta.rds")
-# saveRDS(metdat, "half_aucs_meta.rds")
+# saveRDS(all_predicts, "standard_predictors_meta.rds")
+# saveRDS(metdat, "standard_aucs_meta.rds")
 
-# ##
-# saveRDS(all_predicts, "half4_predictors_meta.rds")
-# saveRDS(metdat, "half4_aucs_meta.rds")
+
