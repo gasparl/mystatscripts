@@ -73,7 +73,7 @@ p_items = ggplot(fulldat, aes(x = sect, y = g_rtprobs_mean)) +
     ) +
     ylab('Response time') + xlab('Trial number') + ggtitle('RTs per Item Type')
 
-colrs_diffs = viridis::viridis(4, end = 0.8)
+colrs_diffs = viridis::viridis(4, end = 0.75)
 # barplot(rep(1, length(colrs_diffs)), col=colrs_diffs)
 
 # MEAN AND SDs
@@ -117,7 +117,7 @@ p_diffs = ggplot(fulldat, aes(x = sect, y = g_rtdiffs_mean)) +
         values = c(
             "Guilty P-C mean" = colrs_diffs[1],
             "Guilty P-C SD" = colrs_diffs[3],
-            "Innocent P-C SD" = colrs_diffs[2]
+            "Innocent P-C SD" = colrs_diffs[4]
         )
     ) +
     scale_fill_manual(
@@ -126,7 +126,7 @@ p_diffs = ggplot(fulldat, aes(x = sect, y = g_rtdiffs_mean)) +
         values = c(
             "Guilty P-C mean" = colrs_diffs[1],
             "Guilty P-C SD" = colrs_diffs[3],
-            "Innocent P-C SD" = colrs_diffs[2]
+            "Innocent P-C SD" = colrs_diffs[4]
         )
     ) +
     theme_bw() + theme(
@@ -221,7 +221,7 @@ for (dsetname in unique(fulldat$dataset[fulldat$dataset != 'dataset 9'])) {
         g_sd = dat_extra$pred_g_rtdiffs_sd[dat_extra$sect == section]
         g_sd = max(c(g_sd, 1))
         i_sd = dat_extra$pred_i_rtdiffs_sd[dat_extra$sect == section]
-        i_sd = max(c(i_sd, g_sd * 0.5, 1))
+        i_sd = max(c(i_sd, 1)) # g_sd * 0.5
         aucs_simmed = c(
             aucs_simmed,
             neatStats::t_neat(
@@ -245,7 +245,7 @@ for (dsetname in unique(fulldat$dataset[fulldat$dataset != 'dataset 9'])) {
 }
 
 fullpred = fullpredmerg
-fullextra = fullextramerg[fullextramerg$sect < 800,]
+fullextra = fullextramerg[fullextramerg$sect < 600,]
 
 auc_maxes = do.call(rbind, lapply(split(
     fullextra, as.factor(fullextra$dataset)
@@ -253,7 +253,7 @@ auc_maxes = do.call(rbind, lapply(split(
     return(x[which.max(x$pred_auc),])
 }))
 
-
+# predicted MEAN AND SDs
 ggplot(fullpred, aes(x = sect, y = g_rtdiffs_mean)) +
     # predicted innocent SD
     geom_line(aes(y = pred_i_rtdiffs_sd),
@@ -290,15 +290,68 @@ ggplot(fullpred, aes(x = sect, y = g_rtdiffs_mean)) +
         data = fullextra,
         fill =  'red',
         alpha = 0.3
-    )  +
-    # original innocent SD
-    geom_line(aes(y = i_rtdiffs_sd), color = 'darkgreen') +
-    # original guilty SD
-    geom_line(aes(y = g_rtdiffs_sd), color = 'darkblue') +
-    # original mean
-    geom_line(color = 'darkred') + facet_wrap(vars(dataset))
+    ) +
+    # innocent SD
+    geom_line(aes(y = i_rtdiffs_sd, color = "Innocent P-C SD"), alpha = 0.8) +
+    geom_ribbon(
+        aes(
+            y = i_rtdiffs_sd,
+            ymin = i_rtdiffs_sd_lo,
+            ymax = i_rtdiffs_sd_up,
+            fill = "Innocent P-C SD"
+        ),
+        alpha = 0.3
+    ) +
+    # guilty SD
+    geom_line(aes(y = g_rtdiffs_sd, color = "Guilty P-C SD"), alpha = 0.8) +
+    geom_ribbon(
+        aes(
+            y = g_rtdiffs_sd,
+            ymin = g_rtdiffs_sd_lo,
+            ymax = g_rtdiffs_sd_up,
+            fill = "Guilty P-C SD"
+        ),
+        alpha = 0.3
+    ) +
+    # guilty mean
+    geom_line(aes(color = "Guilty P-C mean")) +
+    geom_ribbon(
+        aes(
+            ymin = g_rtdiffs_mean - g_rtdiffs_cid,
+            ymax = g_rtdiffs_mean + g_rtdiffs_cid,
+            fill = "Guilty P-C mean"
+        ),
+        alpha = 0.3
+    ) +
+    # etc
+    scale_color_manual(
+        "",
+        breaks = c("Guilty P-C mean", "Guilty P-C SD", "Innocent P-C SD"),
+        values = c(
+            "Guilty P-C mean" = colrs_diffs[1],
+            "Guilty P-C SD" = colrs_diffs[3],
+            "Innocent P-C SD" = colrs_diffs[4]
+        )
+    ) +
+    scale_fill_manual(
+        "",
+        breaks = c("Guilty P-C mean", "Guilty P-C SD", "Innocent P-C SD"),
+        values = c(
+            "Guilty P-C mean" = colrs_diffs[1],
+            "Guilty P-C SD" = colrs_diffs[3],
+            "Innocent P-C SD" = colrs_diffs[4]
+        )
+    ) +
+    theme_bw() + theme(
+        strip.background = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        strip.text = element_text(face = 'plain', size = 12),
+        legend.position = "top",
+        legend.title = element_blank()
+    ) +
+    ylab('Response time') + xlab('Trial number') + ggtitle('Means and SDs of Probe-Control RT Differences') + facet_wrap(vars(dataset))
 
-dcolors = viridis::viridis(11, end = 0.85)
+# AUC extra
 
 fullextra = fullextramerg[fullextramerg$sect < 2000, ]
 ggplot(fullpred, aes(
@@ -327,4 +380,6 @@ ggplot(fullpred, aes(
     ) +  ylab('Extrapolated Area Under the ROC Curve') +
     xlab('Trial number') + ggtitle(NULL) +
     geom_point(data = auc_maxes, aes(x = sect, y = pred_auc))
+
+
 
