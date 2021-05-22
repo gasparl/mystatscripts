@@ -7,6 +7,7 @@ setwd(path_neat())
 
 metacit_dat = readRDS("meta_guilty_trials.rds")
 metacit_dat = metacit_dat[metacit_dat$item_type != 'target',]
+metacit_dat$trial_number = metacit_dat$trial_number/100
 
 str(metacit_dat)
 
@@ -15,41 +16,35 @@ str(metacit_dat)
 
 # tests
 
-mlm_fulmer = lmer(
-  rt ~ item_type + trial_number +
-     item_type:trial_number +
-    (item_type | subject_id) + (item_type | dataset),
-  data = metacit_dat
-)
-
-mlm_full = glmer(
+mlm_full = lmer(
   rt ~ item_type + trial_number +
     item_type:trial_number +
     (item_type | subject_id) + (item_type | dataset),
-  data = metacit_dat,
-  family = Gamma(link = "identity")
+  data = metacit_dat, REML = FALSE
 )
 
-ggpubr::ggqqplot(resid(mlm_full), shape = 1)
-ggpubr::ggdensity(resid(mlm_full))
-lattice::xyplot(profile(mlm_full))
-lattice::densityplot(profile(mlm_full))
-# lattice::splom(profile(mlm_full))
-plot(mlm_full, type = c("p", "smooth"))
-plot(mlm_full, sqrt(abs(resid(.))) ~ fitted(.),type = c("p", "smooth"))
+# mlm_full5 = glmer(
+#   rt ~ item_type + trial_number +
+#     item_type:trial_number +
+#     (1 | subject_id) + (item_type | dataset),
+#   data = metacit_dat, family = Gamma(link = "identity")
+# )
 
-# summary(mlm_full)
-# report::report(mlm_full)
-# parameters::model_parameters(mlm_full)
+summary(mlm_full3)
 
-mlm_xtrial = glmer(
+compp = performance::compare_performance(mlm_full3, mlm_full4, mlm_full5)
+compp
+plot(compp)
+
+report::report(mlm_full)
+
+###
+
+mlm_xtrial = lmer(
   rt ~ item_type + trial_number +
     (item_type | subject_id) + (item_type | dataset),
-  data = metacit_dat,
-  family = Gamma(link = "identity")
+  data = metacit_dat, REML = FALSE
 )
 
-aov_trials = anova(mlm_full, mlm_xtrial)
-
+aov_trials = anova(mlm_xtrial, mlm_full)
 aov_trials
-
