@@ -23,9 +23,9 @@ v_dict = c(
   'st_half_rt_diff' = 'mean P-C difference (halves)',
   'st_half_rt_dcit' = 'standardized P-C difference (halves)',
   'st_half_rt_scaled' = 'standardized Probe RT (halves)',
-  'st_blocked_rt_diff' = 'mean P-C difference (blocks)',
-  'st_blocked_rt_dcit' = 'standardized P-C difference (blocks)',
-  'st_blocked_rt_scaled' = 'standardized Probe RT (blocks)'
+  'st_blocked_rt_diff' = 'mean P-C difference (100-trials)',
+  'st_blocked_rt_dcit' = 'standardized P-C difference (100-trials)',
+  'st_blocked_rt_scaled' = 'standardized Probe RT (100-trials)'
 )
 ## -- Accuracies - cross-validated
 
@@ -169,7 +169,7 @@ ggplot2::ggplot(data = fig_dat, aes(x = dataset,
         panel.grid.minor.y = element_line(color = "#d5d5d5"),
         legend.position = "bottom",
         text = element_text(family = "serif", size = 17)
-    )
+    )+guides(fill=guide_legend(nrow=3,byrow=TRUE))
 
 
 ### META-ANALYSES

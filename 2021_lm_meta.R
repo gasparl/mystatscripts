@@ -30,12 +30,6 @@ mlm_full = lmer(
 #   data = metacit_dat, family = Gamma(link = "identity")
 # )
 
-summary(mlm_full3)
-
-compp = performance::compare_performance(mlm_full3, mlm_full4, mlm_full5)
-compp
-plot(compp)
-
 report::report(mlm_full)
 
 ###
@@ -48,3 +42,7 @@ mlm_xtrial = lmer(
 
 aov_trials = anova(mlm_xtrial, mlm_full)
 aov_trials
+
+compp = performance::compare_performance(mlm_xtrial, mlm_full)
+compp
+plot(compp)

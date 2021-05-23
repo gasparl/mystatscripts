@@ -77,6 +77,14 @@ aov_trials
 aov_blocks
 
 
+#
+mlm_trial_only = lmer(
+  rt_start ~ stim_type + trial_number +
+    stim_type:trial_number +
+    (stim_type | subject_id),
+  data = lgcit_dat
+)
+
 ## plots
 model = mlm_full
 #
