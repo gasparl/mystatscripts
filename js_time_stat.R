@@ -6,12 +6,13 @@ library("ggplot2")
 
 setwd(path_neat(""))
 filenames = list.files(pattern = "^disptime.*.csv$")
+
 secres = 20000
 
-allsampls = data.frame()
+dat_merged = data.frame()
 for (fname in filenames) {
-  # fname = 'disptime_Windows_Chrome_black_20210527112950_pilot1a.csv'
   # fname = 'disptime_Windows_Chrome_black_20210527125457_pilot1b.csv'
+  cat(fname, fill = TRUE)
   raw_sampls = read.table(
     fname,
     sep = ",",
@@ -146,23 +147,90 @@ for (fname in filenames) {
     }
   }
 
+  cond_data = merge(rt_data, trial_data, by = 'trial_number')
 
+  cond_data$bg = dems$bg[1]
+  cond_data$os = dems$os[1]
+  cond_data$browser = dems$browser[1]
+  cond_data$file = fname
+  dat_merged = rbind(dat_merged, cond_data)
 }
 
-## sanity checks
+full_data = dat_merged
+
+###
+
+full_data = full_data[full_data$file == fname,]
+
+full_data$js_disp_start = ifelse(
+  is.na(full_data$raf_start_stamp),
+  full_data$js_disp_start,
+  full_data$raf_start_stamp
+)
+full_data$js_disp_end = ifelse(
+  is.na(full_data$raf_end_stamp),
+  full_data$js_disp_end,
+  full_data$raf_end_stamp
+)
+
+full_data$d1_ext = (full_data$disp_start - full_data$keydown) / secres * 1000
+full_data$d1_js = full_data$js_disp_start - full_data$js_input
+
+full_data$d1_diff = full_data$d1_js - full_data$d1_ext
+
+full_data$d2_ext = (full_data$disp_end - full_data$disp_start) / secres * 1000
+full_data$d2_js = full_data$js_disp_end - full_data$js_disp_start
+
+full_data$d2_diff = full_data$d2_js - full_data$d2_ext
+
+# Best is with:
+# smallest full_data$d1_ext
+# least variability in full_data$d1_diff and full_data$d2_diff
+# full_data$d2_diff closest to zero
+
+
+ggplot(full_data, aes(x = d1_ext)) +
+  geom_histogram(color = "black", fill = "white", bins = 100) +
+  facet_wrap(vars(timer))
+
+ggplot(full_data, aes(x = d1_diff)) +
+  geom_histogram(color = "black", fill = "white", bins = 100) +
+  facet_wrap(vars(timer))
+
+ggplot(full_data, aes(x = d2_diff)) +
+  geom_histogram(color = "black", fill = "white", bins = 100) +
+  facet_wrap(vars(timer))
+
+
+dat_comp = full_data[full_data$timer %in% c('none', 'rpaf_loop'),]
+dat_comp = full_data[full_data$timer %in% c('raf1', 'rpaf_loop'),]
+dat_comp = full_data[full_data$timer %in% c('raf_loop', 'rpaf_loop'),]
+var_tests(dat_comp$d2_diff, dat_comp$timer)
+
+# ggplot(full_data[full_data$duration == 16,], aes(x = d2_ext)) +
+#   geom_histogram(color = "black", fill = "white", bins = 100) +
+#   facet_wrap(vars(timer))
+
+## visual etc checks
 
 # unique(sampls$triggers)
 # ggpubr::gghistogram((c(trial_data$keydown[-1]) -
 #                      trial_data$keydown[-length(trial_data$keydown)]) / secres)
 
+#
 
-d_small = sampls[sampls$sample > 0 & sampls$sample < 30,]
-p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
-  geom_line(color = 'blue') +
-  geom_line(aes(y = triggers), color = 'red')
-p
+# d_small = sampls[sampls$sample > 12 & sampls$sample < 30,]
+# p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
+#   geom_line(color = 'blue') +
+#   geom_line(aes(y = triggers), color = 'red') +
+#   geom_vline(xintercept = trial_data$keydown[1:15] / secres, color = 'green') +
+#   geom_vline(xintercept = trial_data$keyup[1:15] / secres, color = 'grey') +
+#   geom_vline(xintercept = trial_data$disp_start[1:15] / secres, color = 'darkgreen') +
+#   geom_vline(xintercept = trial_data$disp_end[1:15] / secres, color = 'black')
+# p
+# plotly::ggplotly(p)
 
-colrs = viridis::viridis(3, end = .85)
-p = ggplot(data = allsampls, aes(x = sample, y = values, group = 1)) +
-  geom_line() + scale_color_manual(values = colrs) + facet_wrap(vars(version))
-plotly::ggplotly(p)
+# colrs = viridis::viridis(3, end = .85)
+# p = ggplot(data = allsampls, aes(x = sample, y = values, group = 1)) +
+#   geom_line() + scale_color_manual(values = colrs) + facet_wrap(vars(version))
+
