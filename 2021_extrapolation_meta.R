@@ -258,14 +258,14 @@ ggplot(fullpred, aes(x = sect, y = g_rtdiffs_mean)) +
     geom_line(aes(y = pred_i_rtdiffs_sd),
               color = "green",
               data = fullextra) +
-    geom_ribbon(
-        aes(y = pred_i_rtdiffs_sd,
-            ymin = pred_i_rtdiffs_sd_lo,
-            ymax = pred_i_rtdiffs_sd_up),
-        data = fullextra,
-        fill = "green",
-        alpha = 0.3
-    ) +
+    # geom_ribbon(
+    #     aes(y = pred_i_rtdiffs_sd,
+    #         ymin = pred_i_rtdiffs_sd_lo,
+    #         ymax = pred_i_rtdiffs_sd_up),
+    #     data = fullextra,
+    #     fill = "green",
+    #     alpha = 0.3
+    # ) +
     # predicted guilty SD
     geom_line(aes(y = pred_g_rtdiffs_sd),
               color ='blue',

@@ -163,8 +163,12 @@ p_aucs + ggtitle(NULL)
 subdat = fulldat
 lm_g_mean = lm(g_rtdiffs_mean ~ sect, data = subdat)
 lm_g_sd = lm(g_rtdiffs_sd ~ log(sect), data = subdat)
-lm_i_sd = lm(i_rtdiffs_sd ~ log(sect), data = subdat)
+# lm_i_sd = lm(i_rtdiffs_sd ~ log(sect), data = subdat)
 lm_i_sd = gam(i_rtdiffs_sd ~ s(sect, k = 7), data = subdat) # default k = 5
+
+compp = performance::compare_performance(lm_i_sd, lm_i_sd2)
+compp
+plot(compp)
 
 # summary(lm_i_sd)
 # report::report(lm_g_mean)
