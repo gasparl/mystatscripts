@@ -22,42 +22,41 @@ setwd(path_neat())
 # pred_data = readRDS("all_predictors_meta2021.rds")
 
 r_dict =list(
-    preds2 = c('20210422_cla_1', 'Model-based (11 lower-level features)'),
+    feats_low = c('20210422_cla_1', 'Model-based (11 lower-level features)'),
     # 'age', 'rt_mean_probe', 'rt_mean_irrelevant', 'rt_mean_target', 'rt_sd_probe', 'rt_sd_irrelevant', 'rt_sd_target', 'acc_rate_probe', 'acc_rate_irrelevant', 'acc_rate_target', 'gender'
 
-    baseline_2 = c('20210422_cla_2', 'Baseline (2)'),
+    baseline_low = c('20210422_cla_2', 'Baseline (2)'),
     # 'rt_mean_diff'
 
-    baseline_1 = c('report_20200729_cla_1', 'Baseline (1a)'),
+    baseline = c('report_20200729_cla_1', 'Baseline (1a)'),
     # 'rt_mean_diff'
 
-    c('report_20200729_cla_2', 'Model-based (2 features)'),
+    feats_2 = c('report_20200729_cla_2', 'Model-based (2 features)'),
     # "rt_mean_diff", "acc_rate_diff"
 
-    c('report_20200729_cla_3', 'Model-based (5 features)'),
+    feats_5 = c('report_20200729_cla_3', 'Model-based (5 features)'),
     # "rt_mean_diff", "rt_mean_ti_diff", "rt_mean_probe", "rt_mean_irrelevant",  "rt_mean_target"
 
 
-    c('report_20200729_cla_4', 'Model-based (12 features)'),
+    feats_12 = c('report_20200729_cla_4', 'Model-based (12 features)'),
     # "rt_mean_diff", "acc_rate_diff", "rt_mean_ti_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", "rt_mean_target", "acc_rate_probe",  "acc_rate_irrelevant", "acc_rate_target", 'gender', 'age'
 
-    c('report_20200731_cla_1', 'Model-based (6 sign. features)'),
+    feats_6sign = c('report_20200731_cla_1', 'Model-based (6 sign. features)'),
     # "rt_mean_diff", "acc_rate_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", 'age'
 
-    c('report_20200803_cla_1', 'Baseline (1b)'),
+    baseline_stud = c('report_20200803_cla_1', 'Baseline (1b)'),
     # "rt_mean_diff", 'study'
 
-    c('report_20200803_cla_2', 'Model-based (2 features + exp.)'),
+    feats_2_stud = c('report_20200803_cla_2', 'Model-based (2 features + exp.)'),
     # "rt_mean_diff", "acc_rate_diff", 'study'
 
-    c('report_20200803_cla_3', 'Model-based (5 features + exp.)'),
+    feats_5_stud = c('report_20200803_cla_3', 'Model-based (5 features + exp.)'),
     # "rt_mean_diff", "rt_mean_ti_diff", "rt_mean_probe", "rt_mean_irrelevant",  "rt_mean_target", 'study'
 
-    c('report_20200803_cla_4', 'Model-based (12 features + exp.)'),
+    feats_12_stud = c('report_20200803_cla_4', 'Model-based (12 features + exp.)'),
     # "rt_mean_diff", "acc_rate_diff", "rt_mean_ti_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", "rt_mean_target", "acc_rate_probe",  "acc_rate_irrelevant", "acc_rate_target", 'gender', 'age', 'study'
 
-    c('report_20200805_cla_1', 'Model-based (6 sign. features + exp.)')
+    feats_6sign_stud = c('report_20200805_cla_1', 'Model-based (6 sign. features + exp.)')
     # "rt_mean_diff", "acc_rate_diff", "acc_rate_ti_diff", "rt_mean_probe", "acc_rate_probe", "acc_rate_target", 'age', 'study'
-
 
   )
