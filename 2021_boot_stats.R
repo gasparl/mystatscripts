@@ -1,4 +1,8 @@
 library('neatStats')
+library("openxlsx")
+
+mean = median
+
 t_boot = function(var1, var2, n_rep = 20000) {
   # 100,000 bootstrap samples; Efron, 1992
   # first should be greater
@@ -12,51 +16,72 @@ t_boot = function(var1, var2, n_rep = 20000) {
     ls_metric_b = c(ls_metric_b, mean(sample(dataN, length(var1), replace = TRUE)) -
                       mean(sample(dataN, length(var2), replace = TRUE)))
   }
-  pval = sum(ls_metric_b >= metricD)/length(ls_metric_b)
-  return(pval)
+  pval = sum(ls_metric_b >= metricD) / length(ls_metric_b)
+  return(as.numeric(pval))
 }
 
 # Set working directory
 setwd(path_neat())
 
-# pred_data = readRDS("all_predictors_meta2021.rds")
+score_dat = readRDS("2021_ml_scores_data.rds")
 
-r_dict =list(
-    feats_low = c('20210422_cla_1', 'Model-based (11 lower-level features)'),
-    # 'age', 'rt_mean_probe', 'rt_mean_irrelevant', 'rt_mean_target', 'rt_sd_probe', 'rt_sd_irrelevant', 'rt_sd_target', 'acc_rate_probe', 'acc_rate_irrelevant', 'acc_rate_target', 'gender'
+names(score_dat)
 
-    baseline_low = c('20210422_cla_2', 'Baseline (2)'),
-    # 'rt_mean_diff'
+for (sfx in c('_x', '_stud', '_low')) {
+  for (m_typ in c('LR', 'LDA', 'ET')) {
+    if (!(sfx == 'low' && m_typ == 'LDA')) {
+      base_score = score_dat[[paste0('baseline', sfx, '_', m_typ, '_scores')]]
+      base_info = score_dat[[paste0('baseline', sfx, '_', m_typ, '_info')]]
 
-    baseline = c('report_20200729_cla_1', 'Baseline (1a)'),
-    # 'rt_mean_diff'
+      feat_sco_nams = names(score_dat)[grepl(sfx, names(score_dat), fixed = TRUE) &
+                                         grepl(m_typ, names(score_dat), fixed = TRUE) &
+                                         grepl('feats_', names(score_dat), fixed = TRUE) &
+                                         grepl('_scores', names(score_dat), fixed = TRUE)]
+      for (feat_s_nam in feat_sco_nams) {
+        feat_score = score_dat[[feat_s_nam]]
+        feat_info = score_dat[[sub('_scores', '_info', feat_s_nam)]]
+        cat('--------------', fill = TRUE)
+        cat(base_info['full_title'], ' vs. ', feat_info['full_title'], fill = TRUE)
+        b_mean = ro(as.numeric(base_info['s_mean'])*100, round_to = 1)
+        f_mean = ro(as.numeric(feat_info['s_mean'])*100, round_to = 1)
+        cat(b_mean, ' vs. ', f_mean, fill = TRUE)
+        corr_neat(base_score, feat_score, nonparametric = F)
+        corr_neat(base_score, feat_score, nonparametric = T)
 
-    feats_2 = c('report_20200729_cla_2', 'Model-based (2 features)'),
-    # "rt_mean_diff", "acc_rate_diff"
+      }
+    }
+  }
+}
 
-    feats_5 = c('report_20200729_cla_3', 'Model-based (5 features)'),
-    # "rt_mean_diff", "rt_mean_ti_diff", "rt_mean_probe", "rt_mean_irrelevant",  "rt_mean_target"
 
 
-    feats_12 = c('report_20200729_cla_4', 'Model-based (12 features)'),
-    # "rt_mean_diff", "acc_rate_diff", "rt_mean_ti_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", "rt_mean_target", "acc_rate_probe",  "acc_rate_irrelevant", "acc_rate_target", 'gender', 'age'
 
-    feats_6sign = c('report_20200731_cla_1', 'Model-based (6 sign. features)'),
-    # "rt_mean_diff", "acc_rate_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", 'age'
 
-    baseline_stud = c('report_20200803_cla_1', 'Baseline (1b)'),
-    # "rt_mean_diff", 'study'
+## check for BF with correlated data
 
-    feats_2_stud = c('report_20200803_cla_2', 'Model-based (2 features + exp.)'),
-    # "rt_mean_diff", "acc_rate_diff", 'study'
+t_boot(score_dat$feats_low_LR_scores,
+       score_dat$baseline_low_LR_scores)
+neatStats::t_neat(
+  score_dat$feats_low_LR_scores,
+  score_dat$baseline_low_LR_scores,
+  #bf_added = T,
+  nonparametric = TRUE, pair = T
+)
+neatStats::t_neat(
+  score_dat$feats_2_stud_LDA_scores,
+  score_dat$baseline_stud_LDA_scores,
+  #bf_added = T,
+  nonparametric = TRUE, pair = T
+)
 
-    feats_5_stud = c('report_20200803_cla_3', 'Model-based (5 features + exp.)'),
-    # "rt_mean_diff", "rt_mean_ti_diff", "rt_mean_probe", "rt_mean_irrelevant",  "rt_mean_target", 'study'
+ggpubr::ggdensity(score_dat$feats_low_LR_scores)
 
-    feats_12_stud = c('report_20200803_cla_4', 'Model-based (12 features + exp.)'),
-    # "rt_mean_diff", "acc_rate_diff", "rt_mean_ti_diff", "acc_rate_ti_diff", "rt_mean_probe", "rt_mean_irrelevant", "rt_mean_target", "acc_rate_probe",  "acc_rate_irrelevant", "acc_rate_target", 'gender', 'age', 'study'
+quantile(score_dat$feats_low_LR_scores, probs = c(0, 0.025, 0.5, 0.975, 1))
 
-    feats_6sign_stud = c('report_20200805_cla_1', 'Model-based (6 sign. features + exp.)')
-    # "rt_mean_diff", "acc_rate_diff", "acc_rate_ti_diff", "rt_mean_probe", "acc_rate_probe", "acc_rate_target", 'age', 'study'
+'Returns p-value for 0-hypothesis that there is no predictiable pattern
+    between X and Y. p-value is the fraction of values that are more extreme
+    after shuffling the targets than the values obtained without shuffling.
+    p_val = (C + 1) / (n_permutations + 1) with C = n_permutation >= no permut
+    Ref: Ojala and Garriga. Permutation Tests for Studying Classifier
+    Performance. The Journal of Machine Learning Research (2010) vol. 11'
 
-  )
