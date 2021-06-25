@@ -1,7 +1,6 @@
 library('neatStats')
 library("openxlsx")
 
-mean = median
 
 t_boot = function(var1, var2, n_rep = 20000) {
   # 100,000 bootstrap samples; Efron, 1992
@@ -20,6 +19,31 @@ t_boot = function(var1, var2, n_rep = 20000) {
   return(as.numeric(pval))
 }
 
+nb_corrected = function(data1, data2, n_test_per_train) {
+  n = length(data1)
+  differences = data1 - data2
+  stdev = sd(differences)
+  divisor = 1 / n * sum(differences)
+  denominator = sqrt(1 / n + n_test_per_train) * stdev
+  t_stat = divisor / denominator
+  df = n - 1
+  p = (1.0 - pt(abs(t_stat), df)) * 2.0
+  return(p)
+}
+nb_corrected_unpair = function(v1, v2, n_test_per_train) {
+  m1 = mean(v1)
+  m2 = mean(v2)
+  n1 = length(v1)
+  n2 = length(v2)
+  if (n1 != n2) {
+    stop('n1 != n2 ', n1, n2)
+  }
+  s1 = sd(v1)
+  s2 = sd(v2)
+  t = abs(m1 - m2) / (sqrt((s1 ** 2) + (s2 ^ 2))) / sqrt(1 / n1 + n_test_per_train)
+  pval = 2 * pt(t, n1 + n2 - 2, lower.tail = F)
+  return(c(t, pval))
+}
 # Set working directory
 setwd(path_neat())
 
@@ -57,6 +81,14 @@ for (sfx in c('_x', '_stud', '_low')) {
 
 
 
+
+
+my_t_test(score_dat$feats_low_LR_scores,
+             score_dat$baseline_low_LR_scores, 1/5)
+
+nb_corrected(score_dat$feats_low_LR_scores,
+       score_dat$baseline_low_LR_scores, 1/5)
+
 ## check for BF with correlated data
 
 t_boot(score_dat$feats_low_LR_scores,
@@ -73,15 +105,3 @@ neatStats::t_neat(
   #bf_added = T,
   nonparametric = TRUE, pair = T
 )
-
-ggpubr::ggdensity(score_dat$feats_low_LR_scores)
-
-quantile(score_dat$feats_low_LR_scores, probs = c(0, 0.025, 0.5, 0.975, 1))
-
-'Returns p-value for 0-hypothesis that there is no predictiable pattern
-    between X and Y. p-value is the fraction of values that are more extreme
-    after shuffling the targets than the values obtained without shuffling.
-    p_val = (C + 1) / (n_permutations + 1) with C = n_permutation >= no permut
-    Ref: Ojala and Garriga. Permutation Tests for Studying Classifier
-    Performance. The Journal of Machine Learning Research (2010) vol. 11'
-
