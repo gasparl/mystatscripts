@@ -13,6 +13,22 @@ setwd(path_neat(""))
 full_data = readRDS("2021_disp_time_aggr.rds")
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
 full_data$method = full_data$timer
+full_data$keydelay = full_data$js_input - full_data$keydown/ msecres
+# ggpubr::ggdensity(full_data, 'keydelay', facet.by = 'file')
+full_data$keydelay = do.call(rbind, by(full_data, full_data$file, function(sub) {
+  sub$kstandard = sub$keydelay - mean(sub$keydelay)
+  mod = lm(kstandard~keydown, data = sub)
+  sub$out = sub$kstandard - sub$keydown * mod$coefficients[2] - mod$coefficients[1]
+  return(sub)
+}))$out
+
+ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay')
+
+ggplot(full_data, aes(x = keydelay)) +
+  geom_histogram(aes(color = NULL, fill = Browser), bins = 30)  +
+  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
+  theme(legend.position = "top")
+
 
 ###
 
