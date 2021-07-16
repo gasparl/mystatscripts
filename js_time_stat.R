@@ -6,13 +6,14 @@ library("ggplot2")
 
 secres = 20000
 msecres = secres / 1000
-colrs = viridis::viridis(3, end = 0.85)
+colrs = viridis::viridis(4, end = 0.85)
 
 setwd(path_neat(""))
 
 full_data = readRDS("2021_disp_time_aggr.rds")
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
-full_data$method = full_data$timer
+
+full_data = full_data[full_data$study == 'plain',]
 
 ###
 
@@ -30,7 +31,7 @@ full_data$d2_ext[is.na(full_data$d2_ext)] = 0
 full_data$d2_js = full_data$js_end - full_data$js_start
 
 full_data$d2_diff = full_data$d2_js - full_data$d2_ext
-if (mean(abs(full_data$d2_diff)) > 20) {
+if (mean(abs(full_data$d2_diff)) > 25) {
   stop('inconsistent timings: ', mean(abs(full_data$d2_diff)))
 }
 

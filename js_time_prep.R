@@ -6,13 +6,14 @@ library("ggplot2")
 
 setwd(path_neat(""))
 filenames = list.files(pattern = "^disptime.*.csv$")
+#filenames = list.files(pattern = "^disptime_psy.*.csv$")
 #filenames = list.files(pattern = "^disptime_Windows_Microsoft Edge_white_2021_0530_1404*.csv$")
 
 secres = 20000
 
 dat_merged = data.frame()
 for (fname in filenames) {
-  # fname = 'disptime_Windows_Chrome_black_20210527125457_pilot1b.csv'
+  # fname = 'disptime_image_Windows_Opera_white_2021_0714_1531.csv'
   # fname = filenames[1]
   cat(fname, fill = TRUE)
   raw_sampls = read.table(
@@ -173,6 +174,7 @@ for (fname in filenames) {
     stop("missing trials: ", nrow(cond_data), " vs ", nrow(rt_data))
   }
 
+  cond_data$study = dems$study[1]
   cond_data$background = dems$bg[1]
   cond_data$OS = dems$os[1]
   cond_data$Browser = dems$browser[1]
@@ -181,6 +183,8 @@ for (fname in filenames) {
 }
 
 full_data_out = dat_merged
+full_data_out$trial_number = as.numeric(full_data_out$trial_number)
+# str(full_data_out)
 
 # saveRDS(full_data_out, "2021_disp_time_aggr.rds")
 
@@ -193,8 +197,6 @@ full_data_out = dat_merged
 # least variability in full_data$d1_diff and full_data$d2_diff
 # full_data$d2_diff closest to zero
 
-
-
 ## visual etc checks
 
 # unique(sampls$triggers)
@@ -203,17 +205,17 @@ full_data_out = dat_merged
 
 #
 
-# d_small = sampls[sampls$sample > 13 & sampls$sample < 35, ]
-# t_small = trial_data[1:15]
-# # d_small = sampls[seq(1, nrow(sampls), 200), ]
-# # d_small = sampls[(17372722-secres*3):(17372722+secres*4),]
-# p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
-#   geom_line(color = 'blue') +
-#   geom_line(aes(y = triggers), color = 'red') +
-#   geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
-#   geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
-#   geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
-#   geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
+d_small = sampls[sampls$sample > 13 & sampls$sample < 35, ]
+t_small = trial_data[1:15,]
+# d_small = sampls[seq(1, nrow(sampls), 200), ]
+# d_small = sampls[(17372722-secres*3):(17372722+secres*4),]
+p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
+  geom_line(color = 'blue') +
+  geom_line(aes(y = triggers), color = 'red') +
+  geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
+  geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
+  geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
+  geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
 # p
 # plotly::ggplotly(p)
 

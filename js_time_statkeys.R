@@ -12,7 +12,7 @@ setwd(path_neat(""))
 
 full_data = readRDS("2021_disp_time_aggr.rds")
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
-full_data$method = full_data$timer
+
 full_data$keydelay = full_data$js_input - full_data$keydown/ msecres
 # ggpubr::ggdensity(full_data, 'keydelay', facet.by = 'file')
 full_data$keydelay = do.call(rbind, by(full_data, full_data$file, function(sub) {
