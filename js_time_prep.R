@@ -7,7 +7,7 @@ library("ggplot2")
 setwd(path_neat(""))
 filenames = list.files(pattern = "^disptime.*.csv$")
 #filenames = list.files(pattern = "^disptime_psy.*.csv$")
-#filenames = list.files(pattern = "^disptime_Windows_Microsoft Edge_white_2021_0530_1404*.csv$")
+filenames = list.files(pattern = "^disptime_plain_Windows_Opera_white_2021_0714_1548*.csv$")
 
 secres = 20000
 
@@ -106,7 +106,8 @@ for (fname in filenames) {
               }
             }
             if (!is.na(disp_start)) {
-              for (end_i in (disp_start + secres * 0.015):(index + secres * 0.6)) {
+              # look for disp END between 15 and 700 ms after disp_start
+              for (end_i in (disp_start + secres * 0.015):(index + secres * 0.7)) {
                 if (sampls$values[end_i] < cutoff_upp &&
                     mean(sampls$values[(end_i):(end_i + secres * 0.005)]) < cutoff_upp &&
                     mean(sampls$values[(end_i + secres * 0.005):(end_i + secres * 0.015)]) < cutoff_low) {

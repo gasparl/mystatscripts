@@ -23,6 +23,7 @@ full_data$keydelay = do.call(rbind, by(full_data, full_data$file, function(sub) 
 }))$out
 
 ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay')
+ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay', facet.by = c('Browser', 'study'))
 
 ggplot(full_data, aes(x = keydelay)) +
   geom_histogram(aes(color = NULL, fill = Browser), bins = 30)  +

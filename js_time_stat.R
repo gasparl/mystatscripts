@@ -14,6 +14,7 @@ full_data = readRDS("2021_disp_time_aggr.rds")
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
 
 full_data = full_data[full_data$study == 'plain',]
+#full_data = full_data[full_data$study == 'image',]
 
 ###
 
@@ -58,6 +59,8 @@ n_dict = c(
   diff = 'Difference (ms)'
 )
 
+#pdata = pdata[pdata$type == 'img_large', ]
+
 ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d1_ext']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
@@ -73,11 +76,14 @@ ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
+# [full_data$d2_ext != 0,]
+# [pdata$d2_diff < 300,]
 ggplot(pdata, aes(x = d2_diff)) + ggtitle(n_dict['d2_diff']) + xlab(n_dict['diff']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
+# [pdata$d3_diff < 300,]
 ggplot(pdata, aes(x = d3_diff)) + ggtitle(n_dict['d3_diff']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
@@ -88,6 +94,7 @@ dat_comp = full_data[full_data$method %in% c('none', 'rAF_loop'),]
 dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
 dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
 var_tests(dat_comp$d2_diff, dat_comp$method)
+
 
 ggplot(pdata, aes(x = d2_ext)) + ggtitle(n_dict['d2_ext']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
@@ -105,28 +112,3 @@ ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
   theme_bw() + facet_wrap(vars(correct))
 
 
-## visual etc checks
-
-# unique(sampls$triggers)
-# ggpubr::gghistogram((c(trial_data$keydown[-1]) -
-#                      trial_data$keydown[-length(trial_data$keydown)]) / secres)
-
-#
-
-# d_small = sampls[sampls$sample > 13 & sampls$sample < 35, ]
-# t_small = trial_data[1:15]
-# # d_small = sampls[seq(1, nrow(sampls), 200), ]
-# # d_small = sampls[(17372722-secres*3):(17372722+secres*4),]
-# p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
-#   geom_line(color = 'blue') +
-#   geom_line(aes(y = triggers), color = 'red') +
-#   geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
-#   geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
-#   geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
-#   geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
-# p
-# plotly::ggplotly(p)
-
-# colrs = viridis::viridis(3, end = .85)
-# p = ggplot(data = allsampls, aes(x = sample, y = values, group = 1)) +
-#   geom_line() + scale_color_manual(values = colrs) + facet_wrap(vars(version))
