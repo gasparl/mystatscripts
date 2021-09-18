@@ -4,10 +4,11 @@ library("ggplot2")
 #
 # 20,000 samples per second
 
-setwd(path_neat(""))
+setwd(path_neat("pilot4_buff10_buff5"))
 filenames = list.files(pattern = "^disptime.*.csv$")
+print(filenames)
 #filenames = list.files(pattern = "^disptime_psy.*.csv$")
-filenames = list.files(pattern = "^disptime_plain_Windows_Opera_white_2021_0714_1548*.csv$")
+filenames = list.files(pattern = "disptime_plain_Windows_Chrome_white_2021_0821_1220.*.csv$")
 
 secres = 20000
 
@@ -24,7 +25,7 @@ for (fname in filenames) {
     quote = "\"",
     stringsAsFactors = FALSE
   )
-  raw_sampls = raw_sampls[secres:nrow(raw_sampls), ]
+  raw_sampls = raw_sampls[secres:nrow(raw_sampls),]
   rt_data = read.table(
     sub('.csv', '.txt', fname, fixed = TRUE),
     sep = "\t",
@@ -34,11 +35,21 @@ for (fname in filenames) {
     stringsAsFactors = FALSE
   )
 
-  dems_row = rt_data[startsWith(as.character(rt_data$datetime), 'client'),]
+  dems_row = rt_data[startsWith(as.character(rt_data$datetime), 'client'), ]
   dems_heads = strsplit(dems_row[[2]], "/")[[1]]
   dems_dat = strsplit(dems_row[[3]], "/")[[1]]
   dems = do.call(rbind.data.frame, list(dems_dat))
   colnames(dems) = dems_heads
+
+  for (trial in 2:(nrow(rt_data) - 1)) {
+    iti = (rt_data$js_input[trial] - rt_data$js_input[trial - 1])
+    if (iti < 800 | iti > 1300) {
+      message('skipped keys: ',
+              trial,
+              ', ',
+              iti)
+    }
+  }
 
   # midpoint = (min(datapoints) + max(datapoints))/2
   # overmid = which(datapoints > midpoint)
@@ -74,12 +85,10 @@ for (fname in filenames) {
     # detect trigger start from 900 ms from last start
     if (index > (last_start + secres * 0.9) &&
         sampls$triggers[index] == 1) {
-
       # make extra checks for trigger start
       if (mean(sampls$triggers[(index - 10):(index - 1)]) < 0.5 &&
           mean(sampls$triggers[(index):(index + secres * 0.1)]) > 0.9 &&
           mean(sampls$triggers[(index + secres * 0.2):(index + secres * 0.4)]) < 0.1) {
-
         # detect trigger end between 80 and 180 ms after trigger start
         for (endindx in (index + secres * 0.08):(index + secres * 0.18)) {
           if (sampls$triggers[endindx] == 0 &&
@@ -106,8 +115,8 @@ for (fname in filenames) {
               }
             }
             if (!is.na(disp_start)) {
-              # look for disp END between 15 and 700 ms after disp_start
-              for (end_i in (disp_start + secres * 0.015):(index + secres * 0.7)) {
+              # look for disp END between 10 and 700 ms after disp_start
+              for (end_i in (disp_start + secres * 0.010):(index + secres * 0.7)) {
                 if (sampls$values[end_i] < cutoff_upp &&
                     mean(sampls$values[(end_i):(end_i + secres * 0.005)]) < cutoff_upp &&
                     mean(sampls$values[(end_i + secres * 0.005):(end_i + secres * 0.015)]) < cutoff_low) {
@@ -117,17 +126,25 @@ for (fname in filenames) {
               }
             }
 
-            # save stuff
-            trial_data = rbind(
-              trial_data,
-              data.frame(
-                trial_number = trialnum,
-                keydown = index,
-                keyup = endindx,
-                disp_start = disp_start,
-                disp_end = disp_end
+            if ((is.na(disp_start)) & grepl('psychopy', fname) &
+                is.na(disp_end) &
+                  trialnum > 1 & trialnum < nrow(rt_data)) {
+              message('missed key at trial ', trialnum)
+              trialnum = trialnum - 1
+            } else {
+
+              # save stuff
+              trial_data = rbind(
+                trial_data,
+                data.frame(
+                  trial_number = trialnum,
+                  keydown = index,
+                  keyup = endindx,
+                  disp_start = disp_start,
+                  disp_end = disp_end
+                )
               )
-            )
+            }
 
             # since trigger was found, move on to next trial
             last_start = index
@@ -148,25 +165,25 @@ for (fname in filenames) {
   for (trial in 2:nrow(trial_data)) {
     if (trial %% 10 == 1) {
       if (!abs(trial_data$pressdur[trial] - 0.13) < 0.001) {
-        stop('start duration problem (2): ',
-             trial,
-             ', ',
-             trial_data$pressdur[trial])
+        message('start duration problem (2): ',
+                trial,
+                ', ',
+                trial_data$pressdur[trial])
       }
     } else {
       if (!abs(trial_data$pressdur[trial] - 0.1) < 0.001) {
-        stop('start duration problem (3): ',
-             trial,
-             ', ',
-             trial_data$pressdur[trial])
+        message('start duration problem (3): ',
+                trial,
+                ', ',
+                trial_data$pressdur[trial])
       }
     }
     iti = (trial_data$keydown[trial] - trial_data$keydown[trial - 1]) / secres
     if (iti < 0.9 | iti > 1.15) {
-      stop('interval problem: ',
-           trial,
-           ', ',
-           iti)
+      message('interval problem: ',
+              trial,
+              ', ',
+              iti)
     }
   }
 
@@ -185,9 +202,17 @@ for (fname in filenames) {
 
 full_data_out = dat_merged
 full_data_out$trial_number = as.numeric(full_data_out$trial_number)
+# saveRDS(full_data_out, path_neat("2021_disp_time_aggr.rds"))
+
+sum(is.na(full_data_out$disp_end))
+# [1] 228
+
 # str(full_data_out)
 
-# saveRDS(full_data_out, "2021_disp_time_aggr.rds")
+#full_data_out$dispdiff =  (full_data_out$disp_end - full_data_out$disp_start) / secres * 1000
+#full_data_out$dispdiff_x = full_data_out$dispdiff - full_data_out$duration
+
+# saveRDS(full_data_out, path_neat("2021_disp_time_aggr_python.rds"))
 
 ###
 
@@ -206,18 +231,17 @@ full_data_out$trial_number = as.numeric(full_data_out$trial_number)
 
 #
 
-d_small = sampls[sampls$sample > 13 & sampls$sample < 35, ]
-t_small = trial_data[1:15,]
+d_small = sampls[sampls$sample > 13 & sampls$sample < 35,]
+# t_small = trial_data[1:15, ]
 # d_small = sampls[seq(1, nrow(sampls), 200), ]
-# d_small = sampls[(17372722-secres*3):(17372722+secres*4),]
-p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
+d_small = sampls[(3077561 - secres * 3):(3077561 + secres * 4), ]
+ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
   geom_line(color = 'blue') +
-  geom_line(aes(y = triggers), color = 'red') +
-  geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
-  geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
-  geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
-  geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
-# p
+  geom_line(aes(y = triggers), color = 'red') #+
+# geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
+#   geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
+#   geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
+#   geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
 # plotly::ggplotly(p)
 
 # colrs = viridis::viridis(3, end = .85)

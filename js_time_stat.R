@@ -11,10 +11,15 @@ colrs = viridis::viridis(4, end = 0.85)
 setwd(path_neat(""))
 
 full_data = readRDS("2021_disp_time_aggr.rds")
-# full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
+# full_data = readRDS("2021_disp_time_aggr_python.rds")
+# full_data = readRDS("2021_disp_time_aggr_buff10_buff5.rds")
+# full_data = full_data[full_data$file == "disptime_plain_Windows_Chrome_white_2021_0821_1220.csv",]
 
 full_data = full_data[full_data$study == 'plain',]
 #full_data = full_data[full_data$study == 'image',]
+
+#full_data$Browser = 'buff10'
+#full_data$Browser[full_data$file == "disptime_plain_Windows_Chrome_white_2021_0821_1220.csv"] = 'buff5'
 
 ###
 
@@ -28,11 +33,11 @@ full_data$d1_js = full_data$js_start - full_data$js_input
 full_data$d1_diff = full_data$d1_js - full_data$d1_ext
 
 full_data$d2_ext = (full_data$disp_end - full_data$disp_start) / msecres
-full_data$d2_ext[is.na(full_data$d2_ext)] = 0
+#full_data$d2_ext[is.na(full_data$d2_ext)] = 0
 full_data$d2_js = full_data$js_end - full_data$js_start
 
 full_data$d2_diff = full_data$d2_js - full_data$d2_ext
-if (mean(abs(full_data$d2_diff)) > 25) {
+if (mean(abs(full_data$d2_diff[!is.na(full_data$d2_diff)])) > 25) {
   stop('inconsistent timings: ', mean(abs(full_data$d2_diff)))
 }
 
@@ -60,30 +65,36 @@ n_dict = c(
 )
 
 #pdata = pdata[pdata$type == 'img_large', ]
+#pdata = pdata[pdata$method %in% c('rAF_double', 'rAF_loop'),]
 
+print('real from keydown to display')
 ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d1_ext']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
+print('JS from keydown to display')
 ggplot(pdata, aes(x = d1_js)) + ggtitle(n_dict['d1_js']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
+print('DIFF from keydown to display')
 ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 # [full_data$d2_ext != 0,]
-# [pdata$d2_diff < 300,]
+# [pdata$d2_diff < 200,]
+print('DIFF duration (from display to next display)')
 ggplot(pdata, aes(x = d2_diff)) + ggtitle(n_dict['d2_diff']) + xlab(n_dict['diff']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 # [pdata$d3_diff < 300,]
+print('DIFF expected minus real duration')
 ggplot(pdata, aes(x = d3_diff)) + ggtitle(n_dict['d3_diff']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
@@ -112,3 +123,9 @@ ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
   theme_bw() + facet_wrap(vars(correct))
 
 
+## missing frames
+dcheck = full_data
+dcheck = dcheck[is.na(dcheck$d2_diff),]
+ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
+  geom_histogram(aes(color = NULL), bins = 30) + scale_fill_manual(values = colrs)   +
+  theme_bw() + facet_wrap(vars(method, Browser, type, background))

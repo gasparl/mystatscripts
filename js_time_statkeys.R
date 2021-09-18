@@ -11,6 +11,7 @@ colrs = viridis::viridis(3, end = 0.85)
 setwd(path_neat(""))
 
 full_data = readRDS("2021_disp_time_aggr.rds")
+# full_data = readRDS("2021_disp_time_aggr_python.rds")
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
 
 full_data$keydelay = full_data$js_input - full_data$keydown/ msecres
