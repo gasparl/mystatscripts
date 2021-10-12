@@ -4,11 +4,11 @@ library("ggplot2")
 #
 # 20,000 samples per second
 
-setwd(path_neat("pilot4_buff10_buff5"))
+setwd(path_neat("study2"))
 filenames = list.files(pattern = "^disptime.*.csv$")
 print(filenames)
 #filenames = list.files(pattern = "^disptime_psy.*.csv$")
-filenames = list.files(pattern = "disptime_plain_Windows_Chrome_white_2021_0821_1220.*.csv$")
+#filenames = list.files(pattern = "^disptime_plain_Windows_Chrome_white_2021_0929_1218.*.csv$")
 
 secres = 20000
 
@@ -203,6 +203,8 @@ for (fname in filenames) {
 full_data_out = dat_merged
 full_data_out$trial_number = as.numeric(full_data_out$trial_number)
 # saveRDS(full_data_out, path_neat("2021_disp_time_aggr.rds"))
+
+# saveRDS(full_data_out, path_neat("2021_disp_time_aggr_study2.rds"))
 
 sum(is.na(full_data_out$disp_end))
 # [1] 228

@@ -1,21 +1,35 @@
 # libs ----
 library("neatStats")
 library("ggplot2")
+sd_c_l = function(n) {
+  sqrt((n - 1) / qchisq(0.05 / 2, n - 1, lower.tail = FALSE))
+}
+sd_c_u  = function(n) {
+  sqrt((n - 1) / qchisq(0.05 / 2, n - 1, lower.tail = TRUE))
+}
 #
 # 20,000 samples per second
 
 secres = 20000
 msecres = secres / 1000
-colrs = viridis::viridis(4, end = 0.85)
+colrs = viridis::viridis(5, end = 0.85)
 
 setwd(path_neat(""))
 
-full_data = readRDS("2021_disp_time_aggr.rds")
+
+#full_data = readRDS("2021_disp_time_aggr.rds")
+full_data = readRDS("2021_disp_time_aggr_study1.rds")
+full_data$OS = ifelse(full_data$OS != 'Windows',
+                      full_data$OS,
+                      ifelse(substr(full_data$datetime, 6, 9) == '0929', "Win (B)", "Win (A)"))
+full_data$OS[full_data$OS == "Mac OS X"] = "MacOS"
+full_data$Browser[full_data$Browser == "Microsoft Edge"] = "Edge"
+
 # full_data = readRDS("2021_disp_time_aggr_python.rds")
 # full_data = readRDS("2021_disp_time_aggr_buff10_buff5.rds")
 # full_data = full_data[full_data$file == "disptime_plain_Windows_Chrome_white_2021_0821_1220.csv",]
 
-full_data = full_data[full_data$study == 'plain',]
+#full_data = full_data[full_data$study == 'plain',]
 #full_data = full_data[full_data$study == 'image',]
 
 #full_data$Browser = 'buff10'
@@ -43,10 +57,13 @@ if (mean(abs(full_data$d2_diff[!is.na(full_data$d2_diff)])) > 25) {
 
 full_data$d3_diff = full_data$duration - full_data$d2_ext
 
-# Best is with:
-# smallest full_data$d1_ext
-# least variability in full_data$d1_diff and full_data$d2_diff
-# full_data$d2_diff closest to zero
+full_data = full_data[full_data$method %in% c("rAF_double",
+                                              "rAF_loop",
+                                              "rAF_single",
+                                              "none"),]
+
+
+# PLOTTING ####
 
 pdata = full_data
 # pdata = full_data[full_data$duration == 50,]
@@ -80,6 +97,8 @@ ggplot(pdata, aes(x = d1_js)) + ggtitle(n_dict['d1_js']) + xlab(n_dict['dur']) +
   theme(legend.position = "top")
 
 print('DIFF from keydown to display')
+# [pdata$d1_diff > -90 & pdata$OS == 'Windows',]
+# [pdata$background == 'white',]
 ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
@@ -87,6 +106,7 @@ ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff
 
 # [full_data$d2_ext != 0,]
 # [pdata$d2_diff < 200,]
+# [pdata$OS == "Win (B)",]
 print('DIFF duration (from display to next display)')
 ggplot(pdata, aes(x = d2_diff)) + ggtitle(n_dict['d2_diff']) + xlab(n_dict['diff']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
@@ -100,14 +120,7 @@ ggplot(pdata, aes(x = d3_diff)) + ggtitle(n_dict['d3_diff']) + xlab(n_dict['dur'
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
-
-dat_comp = full_data[full_data$method %in% c('none', 'rAF_loop'),]
-dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
-dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
-var_tests(dat_comp$d2_diff, dat_comp$method)
-
-
-ggplot(pdata, aes(x = d2_ext)) + ggtitle(n_dict['d2_ext']) + xlab(n_dict['dur']) +
+ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d2_ext']) + xlab(n_dict['dur']) +
   geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
@@ -129,3 +142,236 @@ dcheck = dcheck[is.na(dcheck$d2_diff),]
 ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
   geom_histogram(aes(color = NULL), bins = 30) + scale_fill_manual(values = colrs)   +
   theme_bw() + facet_wrap(vars(method, Browser, type, background))
+
+# SIGNIFICANCE TESTING ####
+
+
+dat_stat = full_data
+dat_stat$method[dat_stat$method == "none"] = "direct"
+dat_stat$method[dat_stat$method == "rAF_single"] = "RAF 1"
+dat_stat$method[dat_stat$method == "rAF_double"] = "RAF 2"
+dat_stat$method[dat_stat$method == "rAF_loop"] = "RAF loop"
+dat_stat$os_browser = paste(dat_stat$OS, dat_stat$Browser, sep = ' / ')
+dat_stat$os_browser = ifelse(
+  grepl("Win ", dat_stat$os_browser),
+  paste0('  ', dat_stat$os_browser, '  '),
+  dat_stat$os_browser
+)
+dat_stat$os_browser = ifelse(
+  grepl("MacOS", dat_stat$os_browser),
+  paste0(' ', dat_stat$os_browser, ' '),
+  dat_stat$os_browser
+)
+comps = list(c('direct', 'RAF 1'),
+             c('direct', 'RAF 2'),
+             c('direct', 'RAF loop'),
+             c('RAF 1', 'RAF 2'),
+             c('RAF 1', 'RAF loop'),
+             c('RAF 2', 'RAF loop'))
+final_dat = data.frame()
+tests_dat = data.frame()
+for (the_os in unique(dat_stat$OS)) {
+  for (the_brws in unique(dat_stat$Browser)) {
+    dat_comp = dat_stat[dat_stat$OS == the_os &
+                           dat_stat$Browser == the_brws,]
+    if (nrow(dat_comp) < 1) {
+      message('skipped ', the_os, ' / ', the_brws)
+      next
+    }
+    for (comp_pair in comps) {
+      dat_comp2 = dat_comp[dat_comp$method %in% comp_pair, ]
+      res1 = var_tests("d1_diff", group_by = 'method', dat_comp2, hush = T)
+      res2 = var_tests("d2_diff", group_by = 'method', dat_comp2, hush = T)
+      nextrow1 =
+        list(
+          os = the_os,
+          browser = the_brws,
+          os_browser = dat_comp2$os_browser[1],
+          method1 = comp_pair[1],
+          method2 = comp_pair[2],
+          p_BF1 = res1$p_BF,
+          p_FK1 = res1$p_FK,
+          p_BF2 = res2$p_BF,
+          p_FK2 = res2$p_FK,
+          p_wilcox = wilcox.test(dat_comp2$d1_ext[dat_comp2$method == comp_pair[1]],
+                                 dat_comp2$d1_ext[dat_comp2$method == comp_pair[2]])$p.value
+        )
+      tests_dat = rbind(tests_dat, nextrow1)
+    }
+    for (the_meth in unique(dat_comp$method)) {
+      dat_comp3 = dat_comp[dat_comp$method == the_meth, ]
+      d1_dif = dat_comp3$d1_diff[!is.na(dat_comp3$d1_diff)]
+      d2_dif = dat_comp3$d2_diff[!is.na(dat_comp3$d2_diff)]
+      d1mad = DescTools::MADCI(d1_dif, na.rm = TRUE)
+      d2mad = DescTools::MADCI(d2_dif, na.rm = TRUE)
+      d1mad[d1mad == Inf | d1mad == -Inf] = NA
+      d2mad[d2mad == Inf | d2mad == -Inf] = NA
+      nextrow2 =
+        list(
+          os = the_os,
+          browser = the_brws,
+          os_browser = dat_comp3$os_browser[1],
+          method = the_meth,
+          median1 = median(d1_dif),
+          sd1 = sd(d1_dif),
+          mad1 = as.numeric(d1mad['mad']),
+          median2 = median(d2_dif),
+          sd2 = sd(d2_dif),
+          mad2 = as.numeric(d2mad['mad']),
+          sd1_lo = sd(d1_dif) * sd_c_l(length(d1_dif)),
+          sd1_up = sd(d1_dif) * sd_c_u(length(d1_dif)),
+          sd2_lo = sd(d2_dif) * sd_c_l(length(d2_dif)),
+          sd2_up = sd(d2_dif) * sd_c_u(length(d2_dif)),
+          mad1_lo = as.numeric(d1mad['lwr.ci']),
+          mad1_up = as.numeric(d1mad['upr.ci']),
+          mad2_lo = as.numeric(d2mad['lwr.ci']),
+          mad2_up = as.numeric(d2mad['upr.ci']),
+          reaction = median(dat_comp3$d1_ext, na.rm = T),
+          reaction_mad = mad(dat_comp3$d1_ext, na.rm = T)
+        )
+      final_dat = rbind(final_dat, nextrow2)
+    }
+  }
+}
+
+tests_dat$p_BF1adj = p.adjust(tests_dat$p_BF1, "BH")
+tests_dat$p_BF2adj = p.adjust(tests_dat$p_BF2, "BH")
+tests_dat$p_FK1adj = p.adjust(tests_dat$p_FK1, "BH")
+tests_dat$p_FK2adj = p.adjust(tests_dat$p_FK2, "BH")
+tests_dat$p_wilcox_adj = p.adjust(tests_dat$p_wilcox, "BH")
+# tests_dat$p_wilcox_adj2 = ro(tests_dat$p_wilcox_adj, 4)
+
+palcolors = viridis::viridis(2, begin = 0, end = 0.75)
+
+# DIFF 1
+# [final_dat$browser == "Safari",]
+p_dif1 = ggplot2::ggplot(data = final_dat,
+                aes(x = .data$method,
+                    y = .data$sd1,
+                    group = 1, color = 'SD'))  +
+  scale_color_manual(
+    "",
+    breaks = c("SD", "MAD"),
+    values = c(
+      "SD" = palcolors[1],
+      "MAD" = palcolors[2]
+    )
+  )+
+  geom_line() +
+  geom_point(size = 0.6) + geom_errorbar(aes(
+    ymin = .data$sd1_lo,
+    ymax = .data$sd1_up,
+    width = 0.2
+  )) +
+  geom_line(aes(y = .data$mad1, color = 'MAD')) +
+  geom_point(size = 0.6, aes(y = .data$mad1, color = 'MAD')) + geom_errorbar(aes(
+    ymin = .data$mad1_lo,
+    ymax = .data$mad1_up,
+    width = 0.2,
+    color = 'MAD'
+  )) + theme_bw() +
+  labs(x = 'OS / browser', y = "Deviation (ms)") +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#d5d5d5"),
+    panel.grid.minor.y = element_line(color = "#d5d5d5")
+  ) + facet_wrap(~ .data$os_browser, ncol = 3) +
+  theme(strip.background = element_blank(),
+        legend.position = "top",
+        legend.margin = margin(0),
+        legend.text = element_text(margin = margin(r = 7, unit = "pt")))
+
+tests_dat$group1 = tests_dat$method1
+tests_dat$group2 = tests_dat$method2
+tests_dat$pBF = ifelse(tests_dat$p_BF1adj < 0.0001,
+                       '⁎⁎⁎',
+                       ifelse(
+                         tests_dat$p_BF1adj < 0.001,
+                         '⁎⁎',
+                         ifelse(tests_dat$p_BF1adj < 0.01, '⁎', '-')
+                       ))
+tests_dat$pFK = ifelse(tests_dat$p_FK1adj < 0.0001,
+                       '⁎⁎⁎',
+                       ifelse(
+                         tests_dat$p_FK1adj < 0.001,
+                         '⁎⁎',
+                         ifelse(tests_dat$p_FK1adj < 0.01, '⁎', '-')
+                       ))
+tests_dat$p = paste(tests_dat$pBF, tests_dat$pFK, sep = ' ')
+tests_dat$y.position = ifelse((tests_dat$method1 == 'direct' &
+                                 tests_dat$method2 == 'RAF 2'), 14.5, ifelse(
+                                (tests_dat$method1 == 'RAF 1' &
+                                   tests_dat$method2 == 'RAF loop'),
+                              18,
+                              ifelse((tests_dat$method1 == 'direct' &
+                                        tests_dat$method2 == 'RAF loop'),
+                                     21.5,
+                                     11
+                              )))
+
+p_dif1 + ggpubr::stat_pvalue_manual(data = tests_dat, label = NULL)  +
+  scale_y_continuous(
+    breaks = c(0, 5, 10),
+    limits = c(NA, 25),
+    minor_breaks = c(2.5, 7.5)
+  )
+
+# DIFF 2
+
+ggplot2::ggplot(data = final_dat,
+                aes(x = .data$method,
+                    y = .data$sd2,
+                    group = 1, color = 'SD'))  +
+  scale_color_manual(
+    "",
+    breaks = c("SD", "MAD"),
+    values = c(
+      "SD" = palcolors[1],
+      "MAD" = palcolors[2]
+    )
+  )+
+  geom_line() +
+  geom_point(size = 0.6) + geom_errorbar(aes(
+    ymin = .data$sd2_lo,
+    ymax = .data$sd2_up,
+    width = 0.2
+  )) +
+  geom_line(aes(y = .data$mad2, color = 'MAD')) +
+  geom_point(size = 0.6, aes(y = .data$mad2, color = 'MAD')) + geom_errorbar(aes(
+    ymin = .data$mad2_lo,
+    ymax = .data$mad2_up,
+    width = 0.2,
+    color = 'MAD'
+  )) + theme_bw() +
+  labs(x = 'OS / browser', y = "Deviation (ms)") +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#d5d5d5"),
+    panel.grid.minor.y = element_line(color = "#d5d5d5")
+  ) + facet_wrap(~ .data$os_browser, ncol = 3) +
+  theme(strip.background = element_blank(),
+        legend.position = "top",
+        legend.margin = margin(0),
+        legend.text = element_text(margin = margin(r = 7, unit = "pt")))
+
+# Reaction time
+
+onecol = '#3a3a5f'
+ggplot2::ggplot(data = final_dat,
+                aes(x = .data$method,
+                    y = .data$reaction,
+                    group = 1)) +
+  geom_line(color = onecol) +
+  geom_point(color = onecol) + geom_errorbar(aes(
+    ymin = .data$reaction - .data$reaction_mad,
+    ymax = .data$reaction + .data$reaction_mad,
+    width = 0.2
+  ), color = onecol) + theme_bw() +
+  labs(x = 'OS / browser', y = "Reaction time (ms)") +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#d5d5d5"),
+    panel.grid.minor.y = element_line(color = "#d5d5d5")
+  ) + facet_wrap(~ .data$os_browser, ncol = 3) +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(face = 'bold', size = 12))
