@@ -1,17 +1,55 @@
 # libs ----
 library("neatStats")
 library("ggplot2")
+sd_c_l = function(n) {
+  sqrt((n - 1) / qchisq(0.05 / 2, n - 1, lower.tail = FALSE))
+}
+sd_c_u  = function(n) {
+  sqrt((n - 1) / qchisq(0.05 / 2, n - 1, lower.tail = TRUE))
+}
 #
 # 20,000 samples per second
 
 secres = 20000
 msecres = secres / 1000
-colrs = viridis::viridis(3, end = 0.85)
 
 setwd(path_neat(""))
 
-full_data = readRDS("2021_disp_time_aggr.rds")
-# full_data = readRDS("2021_disp_time_aggr_python.rds")
+dat_py = readRDS("2021_disp_time_aggr_python.rds")
+dat_stud = readRDS("2021_disp_time_aggr_study1.rds")
+dat_stud$study = NULL
+full_data = rbind(dat_py, dat_stud)
+full_data$OS = ifelse(full_data$OS != 'Windows',
+                      full_data$OS,
+                      ifelse(substr(full_data$datetime, 6, 9) == '0929', "Win (B)", "Win (A)"))
+full_data$OS[full_data$OS == "Mac OS X"] = "MacOS"
+full_data$Browser[full_data$Browser == "Microsoft Edge"] = "Edge"
+
+full_data$os_browser = paste(full_data$OS, full_data$Browser, sep = ' / ')
+full_data$os_browser[full_data$os_browser == "NA / psychopy"] = "PsychoPy"
+
+full_data$os_browser = ifelse(
+  grepl("Linux", full_data$os_browser),
+  paste0('   ', full_data$os_browser, ''),
+  full_data$os_browser
+)
+full_data$os_browser = ifelse(
+  grepl("MacOS", full_data$os_browser),
+  paste0('  ', full_data$os_browser, ''),
+  full_data$os_browser
+)
+full_data$os_browser = ifelse(
+  grepl("Win ", full_data$os_browser),
+  paste0(' ', full_data$os_browser, ''),
+  full_data$os_browser
+)
+
+full_data$method[full_data$method == "none"] = "direct"
+full_data$method[full_data$method == "rAF_single"] = "RAF 1"
+full_data$method[full_data$method == "rAF_double"] = "RAF 2"
+full_data$method[full_data$method == "rAF_loop"] = "RAF loop"
+
+
 # full_data = full_data[full_data$file == "disptime_Windows_Firefox_white_2021_0530_1343.csv",]
 
 full_data$keydelay = full_data$js_input - full_data$keydown/ msecres
@@ -23,127 +61,169 @@ full_data$keydelay = do.call(rbind, by(full_data, full_data$file, function(sub) 
   return(sub)
 }))$out
 
-ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay')
-ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay', facet.by = c('Browser', 'study'))
-
-ggplot(full_data, aes(x = keydelay)) +
-  geom_histogram(aes(color = NULL, fill = Browser), bins = 30)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-
-###
-
-# full_data = full_data[full_data$file == fname,]
-
-full_data$js_start = full_data$js_start_stamp
-full_data$js_end = full_data$js_end_stamp
-
-full_data$d1_ext = (full_data$disp_start - full_data$keydown) / msecres
-full_data$d1_js = full_data$js_start - full_data$js_input
-full_data$d1_diff = full_data$d1_js - full_data$d1_ext
-
-full_data$d2_ext = (full_data$disp_end - full_data$disp_start) / msecres
-full_data$d2_ext[is.na(full_data$d2_ext)] = 0
-full_data$d2_js = full_data$js_end - full_data$js_start
-
-full_data$d2_diff = full_data$d2_js - full_data$d2_ext
-if (mean(abs(full_data$d2_diff)) > 20) {
-  stop('inconsistent timings: ', mean(abs(full_data$d2_diff)))
-}
-
-full_data$d3_diff = full_data$duration - full_data$d2_ext
-
-# Best is with:
-# smallest full_data$d1_ext
-# least variability in full_data$d1_diff and full_data$d2_diff
-# full_data$d2_diff closest to zero
-
-pdata = full_data
-# pdata = full_data[full_data$duration == 50,]
-# pdata = full_data[full_data$duration == 16,]
-binw = 2
-n_dict = c(
-  d1_ext = 'Real response time (from keydown to display start)',
-  d1_js = 'JS timed response time (from keydown to display start)',
-  d1_diff = 'Difference in response time (from keydown to display): JS minus real',
-  d2_ext = 'Real duration (from display start to display end)',
-  d2_js = 'JS timed duration (from display start to display end)',
-  d2_diff = 'Difference in duration (from display to display end): JS minus real',
-  d3_diff = 'Expected display duration minus real display duration',
-  dur = 'Duration (ms)',
-  diff = 'Difference (ms)'
-)
-
-ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d1_ext']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-ggplot(pdata, aes(x = d1_js)) + ggtitle(n_dict['d1_js']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-ggplot(pdata, aes(x = d2_diff)) + ggtitle(n_dict['d2_diff']) + xlab(n_dict['diff']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-ggplot(pdata, aes(x = d3_diff)) + ggtitle(n_dict['d3_diff']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-
-dat_comp = full_data[full_data$method %in% c('none', 'rAF_loop'),]
-dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
-dat_comp = full_data[full_data$method %in% c('rAF_loop', 'rPAF_loop'),]
-var_tests(dat_comp$d2_diff, dat_comp$method)
-
-ggplot(pdata, aes(x = d2_ext)) + ggtitle(n_dict['d2_ext']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
-  theme(legend.position = "top")
-
-# check issues
-dcheck = full_data[full_data$method == 'rAF_loop' & full_data$Browser == 'Firefox',]
-# dcheck = full_data[full_data$method == 'rPAF_loop' & full_data$Browser == 'Chrome',]
-
-dcheck$correct = ifelse(abs(dcheck$d2_diff) < 5, 'Correct', 'Long')
-dcheck$correct = ifelse(abs(dcheck$d3_diff) < 5, 'Correct', 'Long')
-ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
-  geom_histogram(aes(color = NULL), bins = 30)  +
-  theme_bw() + facet_wrap(vars(correct))
-
-
-## visual etc checks
-
-# unique(sampls$triggers)
-# ggpubr::gghistogram((c(trial_data$keydown[-1]) -
-#                      trial_data$keydown[-length(trial_data$keydown)]) / secres)
+# ggpubr::ggdotplot(full_data, 'trial_number', 'keydelay')
 
 #
+dotplot = ggpubr::ggdotplot(
+  full_data, # fill = "method",
+  'trial_number',
+  'keydelay',
+  xlab = 'Time (trial number)',
+  ylab = 'Relative delay (ms)',
+  facet.by = c('os_browser'),
+) + scale_x_discrete(
+  #breaks = c(0, 250, 500, 1000),
+  breaks = c(250, 500, 750)
+) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(color = "#d5d5d5"),
+    panel.grid.minor.y = element_line(color = "#d5d5d5")
+  ) + theme(
+    strip.background = element_blank(),
+    legend.position = "top",
+    legend.margin = margin(0),
+    legend.text = element_text(margin = margin(r = 7, unit = "pt"))
+  )
 
-# d_small = sampls[sampls$sample > 13 & sampls$sample < 35, ]
-# t_small = trial_data[1:15]
-# # d_small = sampls[seq(1, nrow(sampls), 200), ]
-# # d_small = sampls[(17372722-secres*3):(17372722+secres*4),]
-# p = ggplot(data = d_small, aes(x = sample, y = values, group = 1)) +
-#   geom_line(color = 'blue') +
-#   geom_line(aes(y = triggers), color = 'red') +
-#   geom_vline(xintercept = t_small$keydown / secres, color = 'green') +
-#   geom_vline(xintercept = t_small$keyup / secres, color = 'grey') +
-#   geom_vline(xintercept = t_small$disp_start / secres, color = 'darkgreen') +
-#   geom_vline(xintercept = t_small$disp_end / secres, color = 'black')
-# p
-# plotly::ggplotly(p)
+#[full_data$keydelay <5,]
+ggplot(full_data, aes(x = keydelay)) +
+  geom_histogram(aes(color = NULL, fill = method), bins = 30)  +
+  theme_bw() +
+  # facet_wrap(vars(os_browser)) +
+  facet_wrap(vars(method)) +
+  theme(legend.position = "top")
 
-# colrs = viridis::viridis(3, end = .85)
-# p = ggplot(data = allsampls, aes(x = sample, y = values, group = 1)) +
-#   geom_line() + scale_color_manual(values = colrs) + facet_wrap(vars(version))
+# STATS
+
+colrs = viridis::viridis(6, end = 0.85)
+
+dat_stat = full_data
+dat_statpy = dat_stat[dat_stat$Browser == 'psychopy', ]
+final_dat = data.frame()
+tests_dat = data.frame()
+for (the_os in unique(dat_stat$OS)) {
+  for (the_brws in unique(dat_stat$Browser)) {
+    dat_comp = dat_stat[dat_stat$OS == the_os &
+                          dat_stat$Browser == the_brws,]
+    if (nrow(dat_comp) < 1) {
+      message('skipped ', the_os, ' / ', the_brws)
+      next
+    }
+    the_delays = dat_comp$keydelay[!is.na(dat_comp$keydelay)]
+    d1mad = DescTools::MADCI(the_delays, na.rm = TRUE)
+    d1mad[d1mad == Inf | d1mad == -Inf] = NA
+    nextrow2 =
+      list(
+        os = the_os,
+        browser = the_brws,
+        os_browser = dat_comp$os_browser[1],
+        sd = sd(the_delays),
+        mad = as.numeric(d1mad['mad']),
+        sd_lo = sd(the_delays) * sd_c_l(length(the_delays)),
+        sd_up = sd(the_delays) * sd_c_u(length(the_delays)),
+        mad_lo = as.numeric(d1mad['lwr.ci']),
+        mad_up = as.numeric(d1mad['upr.ci']),
+        reaction_median = median(the_delays),
+        reaction_mad = mad(the_delays),
+        reaction_mean = mean(the_delays),
+        reaction_m_ci = neatStats::mean_ci(the_delays)
+      )
+    final_dat = rbind(final_dat, nextrow2)
+
+    if (the_brws != 'psychopy') {
+      res = var_tests(
+        "keydelay",
+        group_by = 'os_browser',
+        rbind(dat_comp, dat_statpy),
+        hush = T
+      )
+      nextrow1 =
+        list(
+          os = the_os,
+          browser = the_brws,
+          os_browser = dat_comp$os_browser[1],
+          p_BF = res$p_BF,
+          p_FK = res$p_FK,
+          ypos = max(nextrow2$sd, nextrow2$mad)
+        )
+      tests_dat = rbind(tests_dat, nextrow1)
+    }
+  }
+}
+
+tests_dat$p_BFadj = p.adjust(tests_dat$p_BF, "BH")
+tests_dat$p_FKadj = p.adjust(tests_dat$p_FK, "BH")
+# tests_dat$p_BFadj2 = ro(tests_dat$p_BFadj, 4)
+
+palcolors = viridis::viridis(2, begin = 0, end = 0.75)
+
+# [final_dat$browser == "Safari",]
+p_keydlys = ggplot2::ggplot(data = final_dat,
+                         aes(x = .data$os_browser,
+                             y = .data$sd,
+                             group = 1, color = 'SD'))  +
+  scale_color_manual(
+    "",
+    breaks = c("SD", "MAD"),
+    values = c(
+      "SD" = palcolors[1],
+      "MAD" = palcolors[2]
+    )
+  )+
+  geom_line() +
+  geom_point(size = 0.6) + geom_errorbar(aes(
+    ymin = .data$sd_lo,
+    ymax = .data$sd_up,
+    width = 0.2
+  )) +
+  geom_line(aes(y = .data$mad, color = 'MAD')) +
+  geom_point(size = 0.6, aes(y = .data$mad, color = 'MAD')) + geom_errorbar(aes(
+    ymin = .data$mad_lo,
+    ymax = .data$mad_up,
+    width = 0.2,
+    color = 'MAD'
+  )) + theme_bw() +
+  labs(x = 'OS / browser', y = "Deviation (ms)") +
+  theme(
+    panel.grid.major.y = element_blank(),
+    panel.grid.major.x = element_line(color = "#d5d5d5"),
+    panel.grid.minor.x = element_line(color = "#d5d5d5")
+  ) + coord_flip() + scale_x_discrete(limits = (levels(.data$os_browser))) +
+  theme(strip.background = element_blank(),
+        legend.position = "top",
+        legend.margin = margin(0),
+        legend.text = element_text(margin = margin(r = 7, unit = "pt")))
+
+# p_keydlys
+
+tests_dat$group1 = "PsychoPy"
+tests_dat$group2 = tests_dat$os_browser
+tests_dat$pBF = ifelse(tests_dat$p_BFadj < 0.0001,
+                       '⁎⁎⁎',
+                       ifelse(
+                         tests_dat$p_BFadj < 0.001,
+                         '⁎⁎',
+                         ifelse(tests_dat$p_BFadj < 0.01, '⁎', '-')
+                       ))
+tests_dat$pFK = ifelse(tests_dat$p_FKadj < 0.0001,
+                       '⁎⁎⁎',
+                       ifelse(
+                         tests_dat$p_FKadj < 0.001,
+                         '⁎⁎',
+                         ifelse(tests_dat$p_FKadj < 0.01, '⁎', '-')
+                       ))
+tests_dat$p = paste0('(', tests_dat$pBF, ' ', tests_dat$pFK, ')')
+tests_dat$y.position = tests_dat$ypos + 0.1
+
+p_keydlys + ggpubr::stat_pvalue_manual(data = tests_dat,
+                                       remove.bracket = TRUE,
+                                       label = NULL)  +
+  scale_y_continuous(
+    breaks = c(0, 0.25, 0.5, 0.75, 1),
+    # minor_breaks = c(0.25, 0.75),
+    limits = c(NA, 1.02)
+  )
+
+
+
