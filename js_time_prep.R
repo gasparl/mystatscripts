@@ -206,6 +206,9 @@ full_data_out$trial_number = as.numeric(full_data_out$trial_number)
 
 # saveRDS(full_data_out, path_neat("2021_disp_time_aggr_study2.rds"))
 
+# full_data_out = full_data_out[full_data_out$trial_number != 71 | full_data_out$datetime != "2021_0919_0945", ]
+# saveRDS(full_data_out, path_neat("2021_disp_time_aggr_python.rds"))
+
 sum(is.na(full_data_out$disp_end))
 # [1] 228
 
