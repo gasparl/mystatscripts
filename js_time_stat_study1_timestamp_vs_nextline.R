@@ -17,32 +17,35 @@ colrs = viridis::viridis(5, end = 0.85)
 setwd(path_neat(""))
 
 
-#full_data = readRDS("2021_disp_time_aggr.rds")
-full_data = readRDS("2021_disp_time_aggr_study2.rds")
-
-full_data$OS[full_data$OS == "Mac OS X"] = "MacOS"
-full_data$OS[full_data$OS == "Windows"] = "Win"
+#full_data = readRDS("2021_disp_time_aggr_python.rds")
+full_data = readRDS("2021_disp_time_aggr_study1.rds")
+full_data$OS = ifelse(full_data$OS != 'Windows',
+                      full_data$OS,
+                      ifelse(substr(full_data$datetime, 6, 9) == '0929', "Win (B)", "Win (A)"))
+full_data$OS[full_data$OS == "Mac OS X"] = "macOS"
 full_data$Browser[full_data$Browser == "Microsoft Edge"] = "Edge"
-full_data$method[full_data$method == "none"] = "visibility"
-
-full_data$size = ifelse(full_data$type %in% c('img_tiny', 'img_small'),
-                        'small',
-                        'large')
-
-# SIZE CHECK
-# full_data$method = paste(full_data$method, full_data$size, sep = '/')
 
 # full_data = full_data[full_data$file == "disptime_plain_Windows_Chrome_white_2021_0821_1220.csv",]
 
 #full_data = full_data[full_data$study == 'plain',]
 #full_data = full_data[full_data$study == 'image',]
 
-full_data$js_start = full_data$js_start_stamp
+#full_data$js_start = full_data$js_start_stamp
 full_data$js_end = full_data$js_end_stamp
+
+full_data = reshape(
+  full_data,
+  varying = c("js_start_stamp", "js_start_nextline"),
+  v.names = "js_start",
+  timevar = "timer",
+  times = c("timestamp", "direct"),
+  direction = "long"
+)
 
 full_data$d1_ext = (full_data$disp_start - full_data$keydown) / msecres
 full_data$d1_js = full_data$js_start - full_data$js_input
 full_data$d1_diff = full_data$d1_js - full_data$d1_ext
+full_data$d1_key = full_data$d1_diff - full_data$d1_js
 
 full_data$d2_ext = (full_data$disp_end - full_data$disp_start) / msecres
 #full_data$d2_ext[is.na(full_data$d2_ext)] = 0
@@ -55,7 +58,27 @@ if (mean(abs(full_data$d2_diff[!is.na(full_data$d2_diff)])) > 25) {
 
 full_data$d3_diff = full_data$duration - full_data$d2_ext
 
-#
+full_data = full_data[full_data$method %in% c("rAF_double",
+                                              "rAF_loop",
+                                              "rAF_single"),]
+
+full_data$method[full_data$method == "none"] = "direct"
+full_data$method[full_data$method == "rAF_single"] = "RAF 1"
+full_data$method[full_data$method == "rAF_double"] = "RAF 2"
+full_data$method[full_data$method == "rAF_loop"] = "RAF loop"
+full_data$method = paste(full_data$method, full_data$timer, sep = ' / ')
+full_data$os_browser = paste(full_data$OS, full_data$Browser, sep = ' / ')
+full_data$os_browser = ifelse(
+  grepl("Win ", full_data$os_browser),
+  paste0('  ', full_data$os_browser, '  '),
+  full_data$os_browser
+)
+full_data$os_browser = ifelse(
+  grepl("macOS", full_data$os_browser),
+  paste0(' ', full_data$os_browser, ' '),
+  full_data$os_browser
+)
+
 # PLOTTING ####
 
 pdata = full_data
@@ -74,27 +97,36 @@ n_dict = c(
   diff = 'Difference (ms)'
 )
 
+## DIRECT VS TIMESTAMP COMPARISONS
+unique(pdata$OS)
+# "Linux"   "macOS"   "Win (A)" "Win (B)"
+ggplot(pdata[pdata$OS == 'macOS',], aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
+  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, os_browser)) +
+  theme(legend.position = "top")
+
 #pdata = pdata[pdata$type == 'img_large', ]
 #pdata = pdata[pdata$method %in% c('rAF_double', 'rAF_loop'),]
 
 print('real from keydown to display')
 ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d1_ext']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 print('JS from keydown to display')
 ggplot(pdata, aes(x = d1_js)) + ggtitle(n_dict['d1_js']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 print('DIFF from keydown to display')
 # [pdata$d1_diff > -90 & pdata$OS == 'Windows',]
+# [pdata$d1_diff > -70 & pdata$method == 'RAF 1',]
 # [pdata$background == 'white',]
-ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
-  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser, background), nrow = 3) +
+ggplot(pdata[pdata$OS == 'Win (A)',], aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff']) +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
+  theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, os_browser)) +
   theme(legend.position = "top")
 
 # [full_data$d2_ext != 0,]
@@ -102,27 +134,28 @@ ggplot(pdata, aes(x = d1_diff)) + ggtitle(n_dict['d1_diff']) + xlab(n_dict['diff
 # [pdata$OS == "Win (B)",]
 print('DIFF duration (from display to next display)')
 ggplot(pdata, aes(x = d2_diff)) + ggtitle(n_dict['d2_diff']) + xlab(n_dict['diff']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 # [pdata$d3_diff < 300,]
 print('DIFF expected minus real duration')
 ggplot(pdata, aes(x = d3_diff)) + ggtitle(n_dict['d3_diff']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 ggplot(pdata, aes(x = d1_ext)) + ggtitle(n_dict['d1_ext']) + xlab(n_dict['dur']) +
-  geom_histogram(aes(color = NULL, fill = Browser), binwidth = binw)  +
+  geom_histogram(aes(color = NULL, fill = OS), binwidth = binw)  +
   theme_bw() + scale_fill_manual(values = colrs) + facet_wrap(vars(method, Browser)) +
   theme(legend.position = "top")
 
 # check issues
-dcheck = full_data[full_data$method == 'canvas/large' & full_data$OS == 'Win' & full_data$Browser == 'Chrome',]
+dcheck = full_data[full_data$method == 'rAF_loop' & full_data$Browser == 'Firefox',]
 # dcheck = full_data[full_data$method == 'rPAF_loop' & full_data$Browser == 'Chrome',]
-# DescTools::MADCI(dcheck$d1_diff, na.rm = TRUE)
 
+dcheck$correct = ifelse(abs(dcheck$d2_diff) < 5, 'Correct', 'Long')
+dcheck$correct = ifelse(abs(dcheck$d3_diff) < 5, 'Correct', 'Long')
 ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
   geom_histogram(aes(color = NULL), bins = 30)  +
   theme_bw() + facet_wrap(vars(correct))
@@ -138,30 +171,9 @@ ggplot(dcheck, aes(x = duration)) + xlab('Expected durations') +
 # SIGNIFICANCE TESTING ####
 
 dat_stat = full_data
-dat_stat$os_browser = paste(dat_stat$OS, dat_stat$Browser, sep = ' / ')
-dat_stat$os_browser = ifelse(
-  grepl("Win", dat_stat$os_browser),
-  paste0('  ', dat_stat$os_browser, '  '),
-  dat_stat$os_browser
-)
-dat_stat$os_browser = ifelse(
-  grepl("MacOS", dat_stat$os_browser),
-  paste0(' ', dat_stat$os_browser, ' '),
-  dat_stat$os_browser
-)
-
-#
-# comps = list(c('small', 'large'))
-
-# SIZE CHECK
-comps = list(c('canvas/small', 'canvas/large'),
-             c('opacity/small', 'opacity/large'),
-             c('visibility/small', 'visibility/large'))
-#
-
-comps = list(c('visibility', 'canvas'),
-             c('visibility', 'opacity'),
-             c('canvas', 'opacity'))
+comps = list(c('RAF 1 / timestamp', 'RAF 1 / direct'),
+             c('RAF 2 / timestamp', 'RAF 2 / direct'),
+             c('RAF loop / timestamp', 'RAF loop / direct'))
 final_dat = data.frame()
 tests_dat = data.frame()
 for (the_os in unique(dat_stat$OS)) {
@@ -198,16 +210,6 @@ for (the_os in unique(dat_stat$OS)) {
       d2_dif = dat_comp3$d2_diff[!is.na(dat_comp3$d2_diff)]
       d1_ex = dat_comp3$d1_ext[!is.na(dat_comp3$d1_ext)]
       d1mad = DescTools::MADCI(d1_dif, na.rm = TRUE)
-      tryCatch({
-        if (d1mad['upr.ci'] > d1mad['mad'] + 10 |
-            d1mad['lwr.ci'] < d1mad['mad'] - 10) {
-          message('MAD ', paste(ro(d1mad), collapse = " "))
-          d1mad[d1mad > d1mad['mad'] + 10] = NA
-          d1mad[d1mad < d1mad['mad'] - 10] = NA
-          message('corrected ', paste(ro(d1mad), collapse = " "))
-        }
-      },
-      error = function(e) {})
       d2mad = DescTools::MADCI(d2_dif, na.rm = TRUE)
       d1mad[d1mad == Inf | d1mad == -Inf] = NA
       d2mad[d2mad == Inf | d2mad == -Inf] = NA
@@ -250,13 +252,8 @@ tests_dat$p_wilcox_adj = p.adjust(tests_dat$p_wilcox, "BH")
 
 palcolors = viridis::viridis(2, begin = 0, end = 0.75)
 
-# p_dif1+
-#   scale_y_continuous(
-#     limits = c(0, 17)
-#   )
-
 # DIFF 1
-# [final_dat$browser == "  Win / Chrome  ",]
+# [final_dat$browser == "Safari",]
 p_dif1 = ggplot2::ggplot(data = final_dat,
                 aes(x = .data$method,
                     y = .data$sd1,
@@ -310,22 +307,14 @@ tests_dat$pFK = ifelse(tests_dat$p_FK1adj < 0.0001,
                          ifelse(tests_dat$p_FK1adj < 0.01, '⁎', '-')
                        ))
 tests_dat$p = paste(tests_dat$pBF, tests_dat$pFK, sep = ' ')
+tests_dat$y.position = 11
 
-tests_dat$y.position = ifelse((
-  tests_dat$method1 == 'visibility' &
-    tests_dat$method2 == 'canvas'
-), 14.5, 11)
-
-# SIZE TEST
-# tests_dat$y.position = 15
-
-p_dif1 + ggpubr::stat_pvalue_manual(data = tests_dat, label = NULL) +
+p_dif1 + ggpubr::stat_pvalue_manual(data = tests_dat, label = NULL)  +
   scale_y_continuous(
     breaks = c(0, 5, 10),
-    # limits = c(0, 23), # SIZE
-    limits = c(0, 17),
+    limits = c(NA, 25),
     minor_breaks = c(2.5, 7.5)
-  )
+  ) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 # DIFF 2
 
@@ -367,11 +356,10 @@ ggplot2::ggplot(data = final_dat,
 
 # Reaction time
 
-p_rt =
-  ggplot2::ggplot(data = final_dat,
-                  aes(x = .data$method,
-                      y = .data$reaction_mean,
-                      group = 1, color = 'Mean'))  +
+ggplot2::ggplot(data = final_dat,
+                         aes(x = .data$method,
+                             y = .data$reaction_mean,
+                             group = 1, color = 'Mean'))  +
   scale_color_manual(
     "",
     breaks = c("Mean", "Median"),
@@ -404,25 +392,3 @@ p_rt =
         legend.position = "top",
         legend.margin = margin(0),
         legend.text = element_text(margin = margin(r = 7, unit = "pt")))
-
-
-# p_rt
-tests_dat2 = tests_dat
-tests_dat2$p = ifelse(tests_dat2$p_wilcox_adj < 0.0001,
-                      '⁎⁎⁎',
-                      ifelse(
-                        tests_dat2$p_wilcox_adj < 0.001,
-                        '⁎⁎',
-                        ifelse(tests_dat2$p_wilcox_adj < 0.01, '⁎', '-')
-                      ))
-
-tests_dat2$y.position = ifelse((
-  tests_dat2$method1 == 'visibility' &
-    tests_dat2$method2 == 'canvas'
-), 83.5, 80)
-p_rt + ggpubr::stat_pvalue_manual(data = tests_dat2, label = NULL)  +
-  scale_y_continuous(
-    #breaks = c(0, 5, 10),
-    limits = c(NA, 90),
-    #minor_breaks = c(2.5, 7.5)
-  )
