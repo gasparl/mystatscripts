@@ -7,30 +7,42 @@ mcnem = function(v1, v2) {
 }
 
 # simulation procedure to get p values
-sim_pvals = function(cutoff_ans = 0.05, cutoff_rt = 30, n_iter = 1000, fullsamp = 200, corr = 0.5) {
-  groupsamp = fullsamp / 2
+sim_pvals = function(n_iter = 1000,
+                     cutoff_ans = 0.05,
+                     cutoff_rt = 30,
+                     fullsamp = 200,
+                     corr = 0.5) {
+  n_group = fullsamp / 2
   corr_mat <- matrix(corr, ncol = 2, nrow = 2)
   diag(corr_mat) <- 1
 
   cutoff_ans = -cutoff_ans
-  ps_guilt =
-    -replicate(n_iter, t.test(rnorm(100, mean = 1, sd = 3))$p.val, simplify = T)
-  ps_inno =
-    -replicate(n_iter, t.test(rnorm(100, mean = 0, sd = 1))$p.val, simplify = T)
-  # alternatively: ggpubr::ggdensity(rbeta(n = 200, 0.5, 1))
+  # ps_guilt =
+  #   -replicate(n_iter, t.test(rnorm(100, mean = 1, sd = 5.7))$p.val, simplify = T)
+  # ps_inno =
+  #   -replicate(n_iter, t.test(rnorm(100, mean = 0, sd = 1))$p.val, simplify = T)
+  # alternatively: ggpubr::ggdensity(ps_guilt)
+  # alternatively: ggpubr::ggdensity(-rbeta(n = 200, 0.2, 1))
   list_vals = list()
+  pb = txtProgressBar(min = 0, max = n_iter, initial = 0, style = 3)
   for (i in 1:n_iter) {
-    mvdat = MASS::mvrnorm(n = groupsamp, mu = c(0, 0), Sigma = corr_mat, empirical = TRUE)
-    rx <- rank(mvdat[ , 1], ties.method = "first")
-    ry <- rank(mvdat[ , 2], ties.method = "first")
+    setTxtProgressBar(pb, i)
+    mvdat = MASS::mvrnorm(
+      n = n_group,
+      mu = c(0, 0),
+      Sigma = corr_mat,
+      empirical = TRUE
+    )
+    rx <- rank(mvdat[, 1], ties.method = "first")
+    ry <- rank(mvdat[, 2], ties.method = "first")
 
     list_vals2 = list()
     for (rep in 1:3) {
-      ans_g = sort(sample(ps_guilt, groupsamp))[rx]
-      ans_i = sample(ps_inno, groupsamp)
-      rt_g0 = sort(rnorm(groupsamp, mean = 36.8, sd = 33.6))[ry]
-      rt_g1 = sort(rnorm(groupsamp, mean = 60, sd = 33.6))[ry]
-      rt_i = rnorm(groupsamp, mean = 0, sd = 23.5)
+      ans_g = sort(-rbeta(n = n_group, 0.2, 1))[rx]
+      ans_i = -runif(n = n_group, 0, 1)
+      rt_g0 = sort(rnorm(n_group, mean = 36.8, sd = 33.6))[ry]
+      rt_g1 = sort(rnorm(n_group, mean = 60, sd = 33.6))[ry]
+      rt_i = rnorm(n_group, mean = 0, sd = 23.5)
       # corr_neat(ans_g, rt_g0)
       # corr_neat(ans_g, rt_g1)
       preds = data.frame(
@@ -74,10 +86,20 @@ sim_pvals = function(cutoff_ans = 0.05, cutoff_rt = 30, n_iter = 1000, fullsamp 
       list_vals2[[length(list_vals2) + 1]] =
         c(
           p_vals_auc0 =
-            pROC::roc.test(auc_ans, auc_rt0, pair = TRUE, alternative = "less")$p.value
+            pROC::roc.test(
+              auc_ans,
+              auc_rt0,
+              pair = TRUE,
+              alternative = "less"
+            )$p.value
           ,
           p_vals_auc1 =
-            pROC::roc.test(auc_ans, auc_rt1, pair = TRUE, alternative = "less")$p.value
+            pROC::roc.test(
+              auc_ans,
+              auc_rt1,
+              pair = TRUE,
+              alternative = "less"
+            )$p.value
           ,
           auc_ans =
             as.numeric(pROC::auc(auc_ans))
@@ -113,77 +135,92 @@ sim_pvals = function(cutoff_ans = 0.05, cutoff_rt = 30, n_iter = 1000, fullsamp 
     list_vals[[length(list_vals) + 1]] =
       c(
         iter = i,
+        auc_ans = mean(df_3set$auc_ans),
+        auc_rt0 = mean(df_3set$auc_rt0),
+        auc_rt1 = mean(df_3set$auc_rt1),
+
         p_vals_auc0_mean = mean(df_3set$p_vals_auc0),
         p_vals_auc1_mean = mean(df_3set$p_vals_auc1),
         p_vals_auc0_bh = min(p.adjust(df_3set$p_vals_auc0, method = 'BH')),
         p_vals_auc1_bh = min(p.adjust(df_3set$p_vals_auc1, method = 'BH')),
-        p_vals_auc0_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_auc0),
-        p_vals_auc1_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_auc1),
-
-        auc_ans = mean(df_3set$auc_ans),
-        auc_rt0 =mean(df_3set$auc_rt0),
-        auc_rt1 =meanc(df_3set$auc_rt1),
-        p_vals_prop_preset_0_mean = mean(df_3set$p_vals_prop_preset_0),
-        p_vals_prop_preset_1_mean = mean(df_3set$p_vals_prop_preset_1),
-        p_vals_prop_preset_0_bh = min(p.adjust(df_3set$p_vals_prop_preset_0,
-                                               method = 'BH')),
-        p_vals_prop_preset_1_bh = min(p.adjust(df_3set$p_vals_prop_preset_1,
-                                               method = 'BH')),
-        p_vals_prop_preset_0_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_0),
-        p_vals_prop_preset_1_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_1),
-
-        p_vals_prop_best_0_mean = mean(df_3set$p_vals_prop_best_0),
-        p_vals_prop_best_1_mean = mean(df_3set$p_vals_prop_best_1),
-
-        p_vals_auc0_bh = min(p.adjust(df_3set$p_vals_auc0, method = 'BH')),
-        p_vals_auc1_bh = min(p.adjust(df_3set$p_vals_auc1, method = 'BH')),
-        p_vals_auc0_bh = harmonicmeanp::p.hmp(df_3set$p_vals_auc0),
-        p_vals_auc1_bh = harmonicmeanp::p.hmp(df_3set$p_vals_auc1),
+        p_vals_auc0_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_auc0, L=3)),
+        p_vals_auc1_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_auc1, L=3)),
 
         prop_preset_ans = mean(df_3set$prop_preset_ans),
         prop_preset_rt0 = mean(df_3set$prop_preset_rt0),
         prop_preset_rt1 = mean(df_3set$prop_preset_rt1),
         prop_best_ans = mean(df_3set$prop_best_ans),
         prop_best_rt0 = mean(df_3set$prop_best_rt0),
-        prop_best_rt1 = mean(df_3set$prop_best_rt1)
+        prop_best_rt1 = mean(df_3set$prop_best_rt1),
+
+        p_vals_prop_preset_0_mean = mean(df_3set$p_vals_prop_preset_0),
+        p_vals_prop_preset_1_mean = mean(df_3set$p_vals_prop_preset_1),
+        p_vals_prop_preset_0_bh = min(p.adjust(
+          df_3set$p_vals_prop_preset_0,
+          method = 'BH'
+        )),
+        p_vals_prop_preset_1_bh = min(p.adjust(
+          df_3set$p_vals_prop_preset_1,
+          method = 'BH'
+        )),
+        p_vals_prop_preset_0_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_0, L=3)),
+        p_vals_prop_preset_1_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_1, L=3)),
+
+        p_vals_prop_best_0_mean = mean(df_3set$p_vals_prop_best_0),
+        p_vals_prop_best_1_mean = mean(df_3set$p_vals_prop_best_1),
+        p_vals_prop_best_0_bh = min(p.adjust(df_3set$p_vals_prop_best_0,
+                                             method = 'BH')),
+        p_vals_prop_best_1_bh = min(p.adjust(df_3set$p_vals_prop_best_1,
+                                             method = 'BH')),
+        p_vals_prop_best_0_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_prop_best_0, L=3)),
+        p_vals_prop_best_1_hmp = as.numeric(harmonicmeanp::p.hmp(df_3set$p_vals_prop_best_1, L=3))
+
       )
   }
+  close(pb)
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  return(df_pvals[order(df_pvals$iter, df_pvals$look), ])
+  return(df_pvals)
 }
 
-get_pow = function(p_values, alpha = 0.05) {
-  msamp = max(p_values$n)
+get_pow = function(p0, p1, alpha = 0.05) {
   cat(
-    '-- FIXED DESIGN\nN(total) = ',
-    msamp * 2,
-    '\nType I error: ',
-    mean(p_values$p_h0 < alpha),
+    'Type I error: ',
+    mean(p0 < alpha),
     '\nPower: ',
-    mean(p_values$p_h1[p_values$n == msamp] < alpha),
+    mean(p1 < alpha),
     '\n',
     sep = ''
   )
 }
 
-# ggpubr::gghistogram(ps_guilt, binwidth = 0.05)
-# ggpubr::gghistogram(ps_inno, binwidth = 0.05)
-# ans_auc = t_neat(ps_inno, ps_guilt, auc_added = T, plots = T, norm_tests = FALSE)
-# roc_neat(list(ans_auc$roc_obj))
-
-
-# set.seed(2021) # you could do set.seed to get exactly what I got
-# but probably doesn't matter here
-
 # run simulation
-df_ps = sim_pvals(custom_sample, custom_test, list(n = c(200)), 10000)
 
-# get power for conventional alpha
-get_pow(df_ps, alpha = .05)
+df_ps = sim_pvals(100)
+neatStats::peek_neat(df_ps, values = c('auc_ans', 'auc_rt0', 'auc_rt1'))
+neatStats::peek_neat(df_ps, values = c('prop_best_ans', 'prop_best_rt0', 'prop_best_rt1'))
+neatStats::peek_neat(df_ps, values = c('prop_preset_ans', 'prop_preset_rt0', 'prop_preset_rt1'))
 
-# again for small alpha
-get_pow(df_ps, alpha = .001)
 
-# at the moment it's probably senselessly precise
-get_pow(df_ps, alpha = .1735)
+get_pow(
+  p0 = df_ps$p_vals_auc0_mean,
+  p1 = df_ps$p_vals_auc1_mean,
+  alpha = .05
+)
 
+get_pow(
+  p0 = df_ps$p_vals_prop_preset_0_mean,
+  p1 = df_ps$p_vals_prop_preset_1_mean,
+  alpha = .05
+)
+
+get_pow(
+  p0 = df_ps$p_vals_prop_preset_0_bh,
+  p1 = df_ps$p_vals_prop_preset_1_bh,
+  alpha = .05
+)
+
+get_pow(
+  p0 = df_ps$p_vals_prop_best_0_bh,
+  p1 = df_ps$p_vals_prop_best_1_bh,
+  alpha = .05
+)
