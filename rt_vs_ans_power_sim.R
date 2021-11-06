@@ -17,6 +17,7 @@ sim_pvals = function(cutoff_ans = 0.05, cutoff_rt = 30, n_iter = 1000, fullsamp 
     -replicate(n_iter, t.test(rnorm(100, mean = 1, sd = 3))$p.val, simplify = T)
   ps_inno =
     -replicate(n_iter, t.test(rnorm(100, mean = 0, sd = 1))$p.val, simplify = T)
+  # alternatively: ggpubr::ggdensity(rbeta(n = 200, 0.5, 1))
   list_vals = list()
   for (i in 1:n_iter) {
     mvdat = MASS::mvrnorm(n = groupsamp, mu = c(0, 0), Sigma = corr_mat, empirical = TRUE)
@@ -109,22 +110,36 @@ sim_pvals = function(cutoff_ans = 0.05, cutoff_rt = 30, n_iter = 1000, fullsamp 
     }
     df_3set = as.data.frame(do.call(rbind, list_vals2))
 
-    # TODO
-    # calc integrated p vals with averaging, with bonferroni and BH corrected minimum p value, or as HMP
-
-
     list_vals[[length(list_vals) + 1]] =
       c(
         iter = i,
         p_vals_auc0_mean = mean(df_3set$p_vals_auc0),
         p_vals_auc1_mean = mean(df_3set$p_vals_auc1),
+        p_vals_auc0_bh = min(p.adjust(df_3set$p_vals_auc0, method = 'BH')),
+        p_vals_auc1_bh = min(p.adjust(df_3set$p_vals_auc1, method = 'BH')),
+        p_vals_auc0_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_auc0),
+        p_vals_auc1_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_auc1),
+
         auc_ans = mean(df_3set$auc_ans),
         auc_rt0 =mean(df_3set$auc_rt0),
         auc_rt1 =meanc(df_3set$auc_rt1),
         p_vals_prop_preset_0_mean = mean(df_3set$p_vals_prop_preset_0),
         p_vals_prop_preset_1_mean = mean(df_3set$p_vals_prop_preset_1),
+        p_vals_prop_preset_0_bh = min(p.adjust(df_3set$p_vals_prop_preset_0,
+                                               method = 'BH')),
+        p_vals_prop_preset_1_bh = min(p.adjust(df_3set$p_vals_prop_preset_1,
+                                               method = 'BH')),
+        p_vals_prop_preset_0_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_0),
+        p_vals_prop_preset_1_hmp = harmonicmeanp::p.hmp(df_3set$p_vals_prop_preset_1),
+
         p_vals_prop_best_0_mean = mean(df_3set$p_vals_prop_best_0),
         p_vals_prop_best_1_mean = mean(df_3set$p_vals_prop_best_1),
+
+        p_vals_auc0_bh = min(p.adjust(df_3set$p_vals_auc0, method = 'BH')),
+        p_vals_auc1_bh = min(p.adjust(df_3set$p_vals_auc1, method = 'BH')),
+        p_vals_auc0_bh = harmonicmeanp::p.hmp(df_3set$p_vals_auc0),
+        p_vals_auc1_bh = harmonicmeanp::p.hmp(df_3set$p_vals_auc1),
+
         prop_preset_ans = mean(df_3set$prop_preset_ans),
         prop_preset_rt0 = mean(df_3set$prop_preset_rt0),
         prop_preset_rt1 = mean(df_3set$prop_preset_rt1),
