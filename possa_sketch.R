@@ -3,6 +3,7 @@
 # simulation procedure to get p values
 sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
   if (is.atomic(n_obs)) {
+    # if vector given, all samples equal
     n_obs_orig = n_obs
     n_obs = list()
     for (n_name in formalArgs(f_sample)) {
@@ -13,52 +14,54 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
   if (!all(sapply(n_obs, length) == n_look)) {
     stop('The lengths of the "n_obs" values are unequal.')
   }
-  obs_per_it = list()
-  for (lk in 1:n_look) {
-    obs_per_it[[lk]] = sapply(n_obs, '[', lk)
-  }
+  obs_per_it = do.call(Map, c(f = list, n_obs)) # transpose for iteration below
   list_vals = list()
   for (i in 1:n_iter) {
     samples = do.call(f_sample, obs_per_it[[n_look]])
     list_vals[[length(list_vals) + 1]] =
       c(iter = i,
         look = n_look,
-        obs_per_it[[n_look]],
+        unlist(obs_per_it[[n_look]]),
         f_test(samples))
     for (lk in (n_look - 1):1) {
-      # here sample should be subsampled based on variable name
-      # e.g. v1 with "n" because of the "_n"
-      # for this sketch it's all simply with "n"
-      samples = lapply(samples, function(x) {
-        sample(x, obs_per_it[[lk]]['n'])
-      })
+      for (samp_n in names(obs_per_it[[lk]])) {
+        samples[[samp_n]] = sample(samples[[samp_n]],
+                                   obs_per_it[[lk]][[samp_n]])
+      }
       list_vals[[length(list_vals) + 1]] =
         c(iter = i,
           look = lk,
-          obs_per_it[[lk]],
+          unlist(obs_per_it[[lk]]),
           f_test(samples))
     }
   }
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  # class(df_pvals) = c(class(df_pvals), "pvals")
-  return(df_pvals[order(df_pvals$iter, df_pvals$look), ])
+  colsel = colnames(df_pvals) %in% names(n_obs)
+  colnames(df_pvals)[colsel] = paste0(colnames(df_pvals)[colsel], "_n")
+  df_pvals <<- df_pvals
+  n_obs <<- n_obs
+  for (c_nam in names(n_obs)) {
+    class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
+  }
+  class(df_pvals) = c(class(df_pvals), "possa_df")
+  return(df_pvals[order(df_pvals$iter, df_pvals$look),])
 }
 
 # power calculation
 # would be eventually generalizable for any outcome
 # for now only works with the variable names above
 get_pow = function(p_values, alpha = 0.05) {
-  msamp = max(p_values$n)
+  mlook = max(p_values$look)
   cat(
     '-- FIXED DESIGN\nN(total) = ',
     msamp * 2,
     '\nType I error: ',
     mean(p_values$p_h0 < alpha),
     '\nPower: ',
-    mean(p_values$p_h1[p_values$n == msamp] < alpha),
+    mean(p_values$p_h1[p_values$look == mlook] < alpha),
     ' (cf. via pwr: ',
     round(pwr::pwr.t.test(
-      n = msamp, sig.level = alpha, d = .5
+      n = XXXX, sig.level = alpha, d = .5
     )$power, 5),
     ')\n',
     sep = ''
@@ -93,10 +96,10 @@ get_pow = function(p_values, alpha = 0.05) {
   stops = list()
   for (lk in looks) {
     iters_out0 = ps_sub0$iter[ps_sub0$look == lk & ps_sub0$p_h0 < a_adj]
-    ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0, ]
+    ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0,]
     iters_out1 = ps_sub1$iter[ps_sub1$look == lk &
                                 ps_sub1$p_h1 < a_adj]
-    ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1, ]
+    ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1,]
 
     stops[[length(stops) + 1]] = c(
       look = lk,
@@ -153,14 +156,16 @@ custom_test = function(sampl) {
   return(c(p_h0 = p_val0, p_h1 = p_val1))
 }
 
-# set.seed(2021) # you could do set.seed to get exactly what I got
-# but probably doesn't matter here
+# set.seed(2022)
+
+df_ps[sapply(df_ps, function(x) 'possa_n' %in% class(x))]
+lapply(df_ps, class)
 
 # run simulation
 df_ps = sim_pvals(f_sample = custom_sample,
                   n_obs = c(30, 60, 90),
                   f_test = custom_test,
-                  10000)
+                  1000)
 df_ps = sim_pvals(
   f_sample = custom_sample,
   n_obs = list(
@@ -180,4 +185,3 @@ get_pow(df_ps, alpha = .001)
 
 # at the moment it's probably senselessly precise
 get_pow(df_ps, alpha = .1735)
-
