@@ -1,7 +1,14 @@
 # A first sketch for Power Simulation for Sequential Analysis
 
 # simulation procedure to get p values
-sim_pvals = function(f_sample, f_test, n_obs, n_iter = 1000) {
+sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
+  if (is.atomic(n_obs)) {
+    n_obs_orig = n_obs
+    n_obs = list()
+    for (n_name in formalArgs(f_sample)) {
+      n_obs[[n_name]] = n_obs_orig
+    }
+  }
   n_look = length(n_obs[[1]])
   if (!all(sapply(n_obs, length) == n_look)) {
     stop('The lengths of the "n_obs" values are unequal.')
@@ -12,7 +19,7 @@ sim_pvals = function(f_sample, f_test, n_obs, n_iter = 1000) {
   }
   list_vals = list()
   for (i in 1:n_iter) {
-    samples = f_sample(obs_per_it[[n_look]]['n'])
+    samples = do.call(f_sample, obs_per_it[[n_look]])
     list_vals[[length(list_vals) + 1]] =
       c(iter = i,
         look = n_look,
@@ -20,7 +27,7 @@ sim_pvals = function(f_sample, f_test, n_obs, n_iter = 1000) {
         f_test(samples))
     for (lk in (n_look - 1):1) {
       # here sample should be subsampled based on variable name
-      # e.g. v1a_n with "n" because of the "_n"
+      # e.g. v1 with "n" because of the "_n"
       # for this sketch it's all simply with "n"
       samples = lapply(samples, function(x) {
         sample(x, obs_per_it[[lk]]['n'])
@@ -130,18 +137,19 @@ get_pow = function(p_values, alpha = 0.05) {
 
 
 # user-defined function to specify sample(s)
-custom_sample =  function(n) {
+custom_sample =  function(v1, v2_h0, v2_h1) {
   samples = list()
-  samples$v1a_n = rnorm(n, mean = 0, sd = 1)
-  samples$v1b_n = rnorm(n, mean = 0, sd = 1)
-  samples$v2_n = rnorm(n, mean = 0.5, sd = 1)
+  samples$v1 = rnorm(v1, mean = 0, sd = 1)
+  samples$v2_h0 = rnorm(v2_h0, mean = 0, sd = 1)
+  samples$v2_h1 = rnorm(v2_h1, mean = 0.5, sd = 1)
   return(samples)
 }
 
+
 # user-defined function to specify significance test(s)
 custom_test = function(sampl) {
-  p_val0 = t.test(sampl$v1a_n, sampl$v1b_n, var.equal = T)$p.value
-  p_val1 = t.test(sampl$v1a_n, sampl$v2_n, var.equal = T)$p.value
+  p_val0 = t.test(sampl$v1, sampl$v2_h0, var.equal = T)$p.value
+  p_val1 = t.test(sampl$v1, sampl$v2_h1, var.equal = T)$p.value
   return(c(p_h0 = p_val0, p_h1 = p_val1))
 }
 
@@ -149,7 +157,20 @@ custom_test = function(sampl) {
 # but probably doesn't matter here
 
 # run simulation
-df_ps = sim_pvals(custom_sample, custom_test, list(n = c(30, 60, 90)), 10000)
+df_ps = sim_pvals(f_sample = custom_sample,
+                  n_obs = c(30, 60, 90),
+                  f_test = custom_test,
+                  10000)
+df_ps = sim_pvals(
+  f_sample = custom_sample,
+  n_obs = list(
+    v1 = c(30, 60, 90),
+    v2_h0 = c(30, 60, 90),
+    v2_h1 = c(30, 60, 90)
+  ),
+  f_test = custom_test,
+  10000
+)
 
 # get power for conventional alpha
 get_pow(df_ps, alpha = .05)
@@ -159,21 +180,4 @@ get_pow(df_ps, alpha = .001)
 
 # at the moment it's probably senselessly precise
 get_pow(df_ps, alpha = .1735)
-
-
-# TODO:
-
-# Add futility bounds (based on beta? -- not yet sure about the way of implementation)
-
-# Allow to specify not only overall alpha but also the ratio of interim nominal alphas (i.e., if not Pocock; e.g., last one largest if they prioritize informative study over efficiency -- maybe decided by established correction approaches as in rpact, but this may be beyond the scope)
-
-# Allow for multiple testing correction, where each p value is provided in the function (e.g. as a named vector pvalues = c(maineffect1 = .34, maineffect2 = .66, interacteff = .49) ), and optional choice for correction (argument passed to p.adjust()). (But then it must be somehow specified to which p value(s) does the given stopping boundary apply.) Of course, custom correction can be given within the user-defined function too.
-
-# Allow specifying varying factors (in particular: more than one effect size for H1, but also, e.g., different correlations of data) that will then be saved and summarized separately. (These factors could be passed to the function e.g. as "..." given each of their values in each simulation (extracted as formals(myfunc)).)
-
-# In simulation loop record not only p values but also custom data (e.g. effect size), to be able to see how they vary
-
-# Use loading bar if available ("suggest" via R package)
-
-# Add illustrative comparison of Bonferroni corrections
 
