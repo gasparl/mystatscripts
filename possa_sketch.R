@@ -16,7 +16,15 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
   }
   obs_per_it = do.call(Map, c(f = list, n_obs)) # transpose for iteration below
   list_vals = list()
+  pb = utils::txtProgressBar(
+    min = 0,
+    max = n_iter,
+    initial = 0,
+    style = 3
+  )
+  obs_names = names(obs_per_it[[1]])
   for (i in 1:n_iter) {
+    setTxtProgressBar(pb, i)
     samples = do.call(f_sample, obs_per_it[[n_look]])
     list_vals[[length(list_vals) + 1]] =
       c(iter = i,
@@ -24,9 +32,16 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
         unlist(obs_per_it[[n_look]]),
         f_test(samples))
     for (lk in (n_look - 1):1) {
-      for (samp_n in names(obs_per_it[[lk]])) {
-        samples[[samp_n]] = sample(samples[[samp_n]],
-                                   obs_per_it[[lk]][[samp_n]])
+      for (samp_n in obs_names) {
+        if (endsWith(samp_n, '_h')) {
+          for (h_num in c('0', '1')) {
+            samples[[paste0(samp_n, h_num)]] = sample(samples[[paste0(samp_n, h_num)]],
+                                                      obs_per_it[[lk]][[samp_n]])
+          }
+        } else {
+          samples[[samp_n]] = sample(samples[[samp_n]],
+                                     obs_per_it[[lk]][[samp_n]])
+        }
       }
       list_vals[[length(list_vals) + 1]] =
         c(iter = i,
@@ -35,23 +50,29 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
           f_test(samples))
     }
   }
+  close(pb)
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  colsel = colnames(df_pvals) %in% names(n_obs)
-  colnames(df_pvals)[colsel] = paste0(colnames(df_pvals)[colsel], "_n")
-  df_pvals <<- df_pvals
-  n_obs <<- n_obs
+  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look),]
   for (c_nam in names(n_obs)) {
     class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
   }
   class(df_pvals) = c(class(df_pvals), "possa_df")
-  return(df_pvals[order(df_pvals$iter, df_pvals$look),])
+  return(df_pvals)
 }
 
 # power calculation
-# would be eventually generalizable for any outcome
-# for now only works with the variable names above
 get_pow = function(p_values, alpha = 0.05) {
+  n_cols = c()
+  for (c_nam in colnames(p_values)) {
+    col = p_values[[c_nam]]
+    if ('possa_n' %in% class(col)) {
+      n_cols = c(n_cols, c_nam)
+    }
+  }
   mlook = max(p_values$look)
+  row1 = p_values[p_values$look == mlook,][1,]
+  msamp = sum(row1[n_cols])
+
   cat(
     '-- FIXED DESIGN\nN(total) = ',
     msamp * 2,
@@ -61,7 +82,7 @@ get_pow = function(p_values, alpha = 0.05) {
     mean(p_values$p_h1[p_values$look == mlook] < alpha),
     ' (cf. via pwr: ',
     round(pwr::pwr.t.test(
-      n = XXXX, sig.level = alpha, d = .5
+      n = msamp, sig.level = alpha, d = .5
     )$power, 5),
     ')\n',
     sep = ''
@@ -140,11 +161,11 @@ get_pow = function(p_values, alpha = 0.05) {
 
 
 # user-defined function to specify sample(s)
-custom_sample =  function(v1, v2_h0, v2_h1) {
+custom_sample =  function(v1, v2_h) {
   samples = list()
   samples$v1 = rnorm(v1, mean = 0, sd = 1)
-  samples$v2_h0 = rnorm(v2_h0, mean = 0, sd = 1)
-  samples$v2_h1 = rnorm(v2_h1, mean = 0.5, sd = 1)
+  samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
+  samples$v2_h1 = rnorm(v2_h, mean = 0.5, sd = 1)
   return(samples)
 }
 
@@ -158,21 +179,17 @@ custom_test = function(sampl) {
 
 # set.seed(2022)
 
-df_ps[sapply(df_ps, function(x) 'possa_n' %in% class(x))]
-lapply(df_ps, class)
-
 # run simulation
-df_ps = sim_pvals(f_sample = custom_sample,
-                  n_obs = c(30, 60, 90),
-                  f_test = custom_test,
-                  1000)
 df_ps = sim_pvals(
   f_sample = custom_sample,
-  n_obs = list(
-    v1 = c(30, 60, 90),
-    v2_h0 = c(30, 60, 90),
-    v2_h1 = c(30, 60, 90)
-  ),
+  n_obs = c(30, 60, 90),
+  f_test = custom_test,
+  1000
+)
+df_ps = sim_pvals(
+  f_sample = custom_sample,
+  n_obs = list(v1 = c(30, 60, 90),
+               v2_h = c(30, 60, 90)),
   f_test = custom_test,
   10000
 )
