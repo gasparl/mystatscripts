@@ -2,8 +2,6 @@
 
 library("neatStats")
 
-
-
 # COLLECT DATA ----
 
 setwd(path_neat("results"))
@@ -24,7 +22,9 @@ for (f_name_rt in enum(file_names_rt)) {
   # f_name_rt = c(0, "exp_rt_vs_ar_rtcit_8_20220106_1446.txt")
 
   f_name_ar = grep(sub('_rtcit_', '_arcit_',
-                       substring(f_name_rt[2], 1, 23)), file_names_all, value = TRUE)
+                       substring(f_name_rt[2], 1, 23)),
+                   file_names_all,
+                   value = TRUE)
   f_name_qa = grep(sub('_rtcit_', '_qa_',
                        substring(f_name_rt[2], 1, 23)), file_names_all, value = TRUE)
   cat(f_name_rt, f_name_ar, f_name_qa, '; ')
@@ -63,22 +63,22 @@ for (f_name_rt in enum(file_names_rt)) {
   subj_id = subj_data_rt$subject_id[1]
   # session info
   dems_row = subj_data_rt[startsWith(as.character(subj_data_rt$subject_id),
-                                     'session_info'),]
+                                     'session_info'), ]
   dems_heads = strsplit(dems_row[[2]], "/")[[1]]
   dems_dat = strsplit(dems_row[[3]], "/")[[1]]
   dems_rt = do.call(rbind.data.frame, list(dems_dat))
   colnames(dems_rt) = dems_heads
   dems_rt$subject_id = subj_data_rt$subject_id[1]
   dems_row = subj_data_ar[startsWith(as.character(subj_data_ar$subject_id),
-                                     'session_info'),]
+                                     'session_info'), ]
   dems_heads = strsplit(dems_row[[2]], "/")[[1]]
   dems_dat = strsplit(dems_row[[3]], "/")[[1]]
   dems_ar = do.call(rbind.data.frame, list(dems_dat))
   colnames(dems_ar) = dems_heads
   dems_ar$subject_id = subj_data_ar$subject_id[1]
   # safety checks
-  cond_check = dat_conds[as.character(dat_conds$subject_id) == subj_id, ]
-  cond_check$probe_set = substr(cond_check$probe_set, 2, 5)
+  cond_check = dat_conds[as.character(dat_conds$subject_id) == subj_id,]
+  cond_check$probe_set = sub('p', '', cond_check$probe_set, fixed = TRUE)
   for (info_name in c("subject_id",
                       "guilt",
                       "cit_order",
@@ -92,6 +92,13 @@ for (f_name_rt in enum(file_names_rt)) {
            dems_rt[[info_name]],
            '; AR-CIT: ',
            dems_ar[[info_name]])
+    } else if (dems_rt[[info_name]] != subj_data_qa[[info_name]]) {
+      stop('discrepancy in ',
+           info_name,
+           '! RT-CIT: ',
+           dems_rt[[info_name]],
+           '; QA: ',
+           subj_data_qa[[info_name]])
     } else if (dems_rt[[info_name]] != cond_check[[info_name]]) {
       stop('discrepancy in ',
            info_name,
@@ -118,7 +125,7 @@ for (f_name_rt in enum(file_names_rt)) {
   }
   ## RT-CIT
 
-  subj_itms_base = subj_data_rt[subj_data_rt$phase == 'main',]
+  subj_itms_base = subj_data_rt[subj_data_rt$phase == 'main', ]
   # subj_itms_base = subj_data_rt[subj_data_rt$phase == 'main' & subj_data_rt$trial_number <= 81, ]
 
   if (nrow(subj_itms_base) != 162 * 2) {
@@ -136,18 +143,18 @@ for (f_name_rt in enum(file_names_rt)) {
     0
   )
 
-  dems_rt$mean_diff2 = (mean(subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
+  dems_rt$rt_mean_diff = (mean(subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
                                                        subj_itms_base$stim_type == 'probe']) -
                           mean(subj_itms_base$rt_start[subj_itms_base$valid_trial == 1 &
                                                          subj_itms_base$stim_type == 'control']))
   if (is.na(dems_rt$mean_diff) || dems_rt$mean_diff == 'NA') {
     warning('mean_diff "NA"')
-  } else if (round(dems_rt$mean_diff2, 1) != round(as.numeric(dems_rt$mean_diff), 1)) {
+  } else if (round(dems_rt$rt_mean_diff, 1) != round(as.numeric(dems_rt$mean_diff), 1)) {
     stop(
       'discrepancy in mean diff: \nmean diff CIT: ',
       dems_rt$mean_diff,
       '\nmean diff R: ',
-      dems_rt$mean_diff2
+      dems_rt$rt_mean_diff
     )
   }
 
@@ -179,15 +186,14 @@ for (f_name_rt in enum(file_names_rt)) {
   )
 
   dems = merge(dems_rt, dems_ar)
+  dems = merge(dems, subj_data_qa)
   dems$subject_id = NULL
-  rbind_loop(
-    main_cit_merg,
-    subject_id = subj_id,
-    dems,
-    subj_acc_rates,
-    subj_rt_mean,
-    correct_counts,
-    subj_data_qa)
+  rbind_loop(main_cit_merg,
+             subject_id = subj_id,
+             dems,
+             subj_acc_rates,
+             subj_rt_mean,
+             correct_counts)
 }
 
 main_cit_prep = main_cit_merg
@@ -202,71 +208,75 @@ for (colname in names(main_cit_prep)) {
   }
 }
 
-main_cit_data = main_cit_prep
+main_cit_data = excl_neat(main_cit_prep, filt = (correct_noted == 4 |
+                                                   guilt == 'innocent'))
+main_cit_data = excl_neat(main_cit_data,
+                          filt = (correct_num_probe_banks > 2 |
+                                    correct_num_probe_names > 2))
+main_cit_data = excl_neat(main_cit_data,
+                          filt = (correct_num_control_banks > 5 |
+                                    correct_num_control_names > 5))
 
 # peek_neat(grp_dat, 'overall_acc_main')
-# peek_neat(grp_dat, 'overall_acc_target')
-# peek_neat(grp_dat, 'overall_acc_filler')
 
 full_data = main_cit_data # [main_cit_data$subject_id != 'REN_20200905210301',]
 
 # demographics
 neatStats::dems_neat(full_data,
-                     group_by = c('condition'),
+                     group_by = c('guilt', 'cit_order'),
                      percent = T)
 
 # ANALYSIS ----
 
-#full_data = full_data[full_data$batch,]
-
 neatStats::plot_neat(
   full_data,
   #eb_method = sd,
-  values = c('rt_mean_diff_varied',
-             'rt_mean_diff_regular'),
-  #between_vars = c('filler_type'),
-  between_vars = c('firstcond'),
-  #between_vars = c('filler_type', 'firstcond'),
-  #between_vars = c('filler_type'),
-  value_names = c(
-    regular = 'First: three fillers',
-    varied = 'First: six fillers',
-    rt_mean_diff_varied = 'Six fillers',
-    rt_mean_diff_regular = 'Three fillers'
-  ),
+  values = c('rt_mean_diff_banks',
+             'rt_mean_diff_names'),
+  #between_vars = c('guilt', 'cit_order'),
+  between_vars = c('guilt'),
   y_title = 'Probe-Control RT Differences'
 )
 
-neatStats::anova_neat(
-  full_data,
-  values = c('rt_mean_diff_varied',
-             'rt_mean_diff_regular'),
-  between_vars = c('filler_type'),
-  bf_added = F,
-  plot_means = T
-)
-
 t_neat(
-  full_data$rt_mean_diff_varied,
-  full_data$rt_mean_diff_regular,
+  full_data$rt_mean_probe_names,
+  full_data$rt_mean_control_names,
   plots = F,
-  greater = '1',
-  bf_added = T#, nonparametric = T
+  greater = '1' #, nonparametric = T
+)
+t_neat(
+  full_data$rt_mean_probe_banks,
+  full_data$rt_mean_control_banks,
+  plots = F,
+  greater = '1' #, nonparametric = T
 )
 
 # ratings
 
-corr_neat(rat_data$rt_mean_diff, rat_data$r_anxiety, nonparametric = TRUE)
-corr_neat(rat_data$rt_mean_diff, rat_data$r_realism, nonparametric = TRUE)
-corr_neat(rat_data$rt_mean_diff, rat_data$r_excitement, nonparametric = TRUE)
+t_neat(
+  full_data$accuracy1,
+  full_data$accuracy2,
+  plots = F, nonparametric = T
+)
+t_neat(
+  full_data$detected1,
+  full_data$detected2,
+  plots = F, nonparametric = T
+)
 
-full_data$amount = as.numeric(as.character(full_data$amount))
-corr_neat(full_data$rt_mean_diff, full_data$amount)
+corr_neat(full_data$mean_diff, full_data$accuracy1, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$accuracy2, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$detected1, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$detected2, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$attention, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$realism, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$anxiety, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$excitement, nonparametric = TRUE)
+corr_neat(full_data$mean_diff, full_data$attention, nonparametric = TRUE)
 
 # write.table(full_data, "results_aggregated_exp2_index_vs_thumb.txt", quote = F, row.names = F, sep="\t")
 
 ## final summary ----
-
 
 main_results = table_neat(
   list(
@@ -292,90 +302,7 @@ main_results = table_neat(
     aggr_neat(full_data, full_data$dur_mean_diff, round_to = 2)
   ),
   to_clipboard = T,
-  group_by = c('l1')
-)
-
-
-main_results = table_neat(
-  list(
-    aggr_neat(full_data, full_data$rt_mean_probe_normal, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_control_normal, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_target_normal, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_nontargflr_normal, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_targetflr_normal, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_diff_normal, round_to = 1),
-
-    aggr_neat(full_data, full_data$acc_rate_probe_normal * 100, round_to = 1),
-    aggr_neat(full_data,
-              full_data$acc_rate_control_normal * 100,
-              round_to = 1),
-    aggr_neat(full_data, full_data$acc_rate_target_normal * 100, round_to = 1),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_nontargflr_normal * 100,
-      round_to = 1
-    ),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_targetflr_normal * 100,
-      round_to = 1
-    ),
-    aggr_neat(full_data, full_data$acc_rate_diff_normal * 100, round_to = 2),
-
-    aggr_neat(full_data, full_data$dur_mean_probe_normal, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_control_normal, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_target_normal, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_nontargflr_normal, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_targetflr_normal, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_diff_normal, round_to = 2),
-
-    #
-
-    aggr_neat(full_data, full_data$rt_mean_probe_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_control_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_target_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_nontargflr_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_targetflr_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$rt_mean_diff_scrambled, round_to = 1),
-
-    aggr_neat(full_data, full_data$acc_rate_probe_scrambled * 100, round_to = 1),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_control_scrambled * 100,
-      round_to = 1
-    ),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_target_scrambled * 100,
-      round_to = 1
-    ),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_nontargflr_scrambled * 100,
-      round_to = 1
-    ),
-    aggr_neat(
-      full_data,
-      full_data$acc_rate_targetflr_scrambled * 100,
-      round_to = 1
-    ),
-    aggr_neat(full_data, full_data$acc_rate_diff_scrambled * 100, round_to = 2),
-
-    aggr_neat(full_data, full_data$dur_mean_probe_scrambled, round_to = 0),
-    aggr_neat(full_data,
-              full_data$dur_mean_control_scrambled,
-              round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_target_scrambled, round_to = 0),
-    aggr_neat(
-      full_data,
-      full_data$dur_mean_nontargflr_scrambled,
-      round_to = 0
-    ),
-    aggr_neat(full_data, full_data$dur_mean_targetflr_scrambled, round_to = 0),
-    aggr_neat(full_data, full_data$dur_mean_diff_scrambled, round_to = 2)
-  ),
-  to_clipboard = T,
-  group_by =  c('l1')
+  group_by = c('guilt')
 )
 
 # write.table(main_results, "main_stats_table.txt", quote = F, row.names = F, sep="\t")
