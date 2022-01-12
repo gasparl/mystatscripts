@@ -84,7 +84,7 @@ get_pow = function(p_values, alpha = 0.05) {
     round(pwr::pwr.t.test(
       n = msamp, sig.level = alpha, d = .5
     )$power, 5),
-    ')\n',
+    ')\n\n',
     sep = ''
   )
 
@@ -107,7 +107,11 @@ get_pow = function(p_values, alpha = 0.05) {
     }
     a_adj = a_adj + a_step
     # cat('type1', type1, 'a_adj:', a_adj, 'new step:', a_step, fill = T)
+    cat('\r| Getting alpha: ', type1, ' (step: ', a_step, ') |    ', sep = '')
+    flush.console()
   }
+  cat('\r                                                                     ')
+  flush.console()
   p_values$h1_sign = p_values$p_h1 < a_adj
   seq_power = mean(aggregate(h1_sign ~ iter, data = p_values, FUN = any)$h1_sign)
 
@@ -143,7 +147,7 @@ get_pow = function(p_values, alpha = 0.05) {
   df_stops$look[dflen] = 'totals'
 
   cat(
-    '\n-- SEQUENTIAL DESIGN\nN(total-avg) = ',
+    '-- SEQUENTIAL DESIGN\nN(total-avg) = ',
     df_stops$avg_0[dflen] * 2,
     ' (if H0 true) or ',
     df_stops$avg_1[dflen] * 2,
@@ -159,6 +163,36 @@ get_pow = function(p_values, alpha = 0.05) {
   print(df_stops)
 }
 
+library('gsDesign')
+gsDesign::gsDesign(k = 3, sfu = sfLDPocock, test.type = 2)
+gsDesign::gsDesign(k = 3, sfu = sfLDOF, test.type = 2)
+
+alpha = 0.025
+Kstops = 3
+z_total = qnorm(1 - alpha)
+for (k_stop in 1:Kstops) {
+  z_interim = z_total * (sqrt(Kstops / k_stop))
+  a_interim = 1 - pnorm(z_interim)
+  a_frac = k_stop / Kstops
+  a_interim_OFf = 4 * (1 - pnorm(qnorm(1 - (alpha / 4)) / (sqrt(a_frac))))
+  a_interim_Pf = alpha * log(1 + (exp(1) - 1) * a_frac)
+  message(
+    'Look #',
+    k_stop,
+    '\nO Brien and Fleming alpha: ',
+    round(a_interim, 5),
+    ', z: ',
+    round(z_interim, 5),
+    '\nO Brien and Fleming alpha with function: ',
+    round(a_interim_OFf, 5),
+    ', z: ',
+    round(qnorm(1 - a_interim_OFf), 5),
+    '\nPockock alpha with function: ',
+    round(a_interim_Pf, 5),
+    ', z: ',
+    round(qnorm(1 - a_interim_Pf), 5)
+  )
+}
 
 # user-defined function to specify sample(s)
 custom_sample =  function(v1, v2_h) {
