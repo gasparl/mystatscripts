@@ -12,12 +12,12 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     f_s_args[[1]] = NULL
     # get all f_sample argument combinations
     df_combs = sapply(expand.grid(f_s_args), as.vector)
-    args_list = list()
+    f_s_a_list = list()
     for (rownum in 1:nrow(df_combs)) {
-      args_list[[rownum]] = as.list(df_combs[rownum, ])
+      f_s_a_list[[rownum]] = as.list(df_combs[rownum, ])
     }
   } else {
-    f_s_args = list(NA)
+    f_s_a_list = NA
   }
   if (is.atomic(n_obs)) {
     # if vector given, all samples equal
@@ -36,12 +36,15 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
   list_vals = list()
   pb = utils::txtProgressBar(
     min = 0,
-    max = n_iter,
+    max = n_iter * length(f_s_a_list),
     initial = 0,
     style = 3
   )
   obs_names = names(obs_per_it[[1]])
-  for (f_s_a in f_s_args) {
+  for (f_s_a in f_s_a_list) {
+    if (is.na(f_s_a)) {
+      f_s_a = NULL
+    }
     for (i in 1:n_iter) {
       setTxtProgressBar(pb, i)
       samples = do.call(f_sample, c(obs_per_it[[n_look]], f_s_a))
@@ -229,22 +232,17 @@ custom_test = function(sampl) {
   )
 }
 
-f_s_args = list(h1_mean = c(0.5, 1, 1.5),
-                h1_sd = c(1, 1.5))
 
-
-
-# run simulation
+# run simulation ####
 # varied parameters
 df_ps = sim_pvals(
   f_sample = list(
-    custom_sample,
+    custom_sample2,
     h1_mean = c(0.5, 1, 1.5),
     h1_sd = c(1, 1.5)
   ),
   n_obs = c(30, 60, 90),
   f_test = custom_test,
-  n_obs = list(),
   n_iter = 1000
 )
 
