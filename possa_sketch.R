@@ -10,6 +10,14 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     }
     f_sample = f_s_args[[1]]
     f_s_args[[1]] = NULL
+    # get all f_sample argument combinations
+    df_combs = sapply(expand.grid(f_s_args), as.vector)
+    args_list = list()
+    for (rownum in 1:nrow(df_combs)) {
+      args_list[[rownum]] = as.list(df_combs[rownum,])
+    }
+  } else {
+    f_s_args = list(NA)
   }
   if (is.atomic(n_obs)) {
     # if vector given, all samples equal
@@ -175,7 +183,7 @@ get_pow = function(p_values, alpha = 0.05) {
 
 
 # user-defined function to specify sample(s)
-custom_sample1 =  function(v1, v2_h, h1_mean) {
+custom_sample1 = function(v1, v2_h, h1_mean) {
   samples = list()
   samples$v1 = rnorm(v1, mean = 0, sd = 1)
   samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
@@ -183,7 +191,7 @@ custom_sample1 =  function(v1, v2_h, h1_mean) {
   return(samples)
 }
 
-custom_sample2 =  function(v1, v2_h, h1_mean, h1_sd) {
+custom_sample2 = function(v1, v2_h, h1_mean, h1_sd) {
   samples = list()
   samples$v1 = rnorm(v1, mean = 0, sd = 1)
   samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
@@ -216,6 +224,12 @@ custom_test = function(sampl) {
     )
   )
 }
+
+f_s_args = list(
+  h1_mean = c(0.5, 1, 1.5),
+  h1_sd = c(1, 1.5)
+)
+
 
 
 # run simulation
