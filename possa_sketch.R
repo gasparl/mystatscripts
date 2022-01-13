@@ -14,7 +14,7 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     df_combs = sapply(expand.grid(f_s_args), as.vector)
     args_list = list()
     for (rownum in 1:nrow(df_combs)) {
-      args_list[[rownum]] = as.list(df_combs[rownum,])
+      args_list[[rownum]] = as.list(df_combs[rownum, ])
     }
   } else {
     f_s_args = list(NA)
@@ -41,36 +41,40 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     style = 3
   )
   obs_names = names(obs_per_it[[1]])
-  for (i in 1:n_iter) {
-    setTxtProgressBar(pb, i)
-    samples = do.call(f_sample, obs_per_it[[n_look]])
-    list_vals[[length(list_vals) + 1]] =
-      c(iter = i,
-        look = n_look,
-        unlist(obs_per_it[[n_look]]),
-        f_test(samples))
-    for (lk in (n_look - 1):1) {
-      for (samp_n in obs_names) {
-        if (endsWith(samp_n, '_h')) {
-          for (h_num in c('0', '1')) {
-            samples[[paste0(samp_n, h_num)]] = sample(samples[[paste0(samp_n, h_num)]],
-                                                      obs_per_it[[lk]][[samp_n]])
-          }
-        } else {
-          samples[[samp_n]] = sample(samples[[samp_n]],
-                                     obs_per_it[[lk]][[samp_n]])
-        }
-      }
+  for (f_s_a in f_s_args) {
+    for (i in 1:n_iter) {
+      setTxtProgressBar(pb, i)
+      samples = do.call(f_sample, c(obs_per_it[[n_look]], f_s_a))
       list_vals[[length(list_vals) + 1]] =
         c(iter = i,
-          look = lk,
-          unlist(obs_per_it[[lk]]),
+          look = n_look,
+          unlist(f_s_a),
+          unlist(obs_per_it[[n_look]]),
           f_test(samples))
+      for (lk in (n_look - 1):1) {
+        for (samp_n in obs_names) {
+          if (endsWith(samp_n, '_h')) {
+            for (h_num in c('0', '1')) {
+              samples[[paste0(samp_n, h_num)]] = sample(samples[[paste0(samp_n, h_num)]],
+                                                        obs_per_it[[lk]][[samp_n]])
+            }
+          } else {
+            samples[[samp_n]] = sample(samples[[samp_n]],
+                                       obs_per_it[[lk]][[samp_n]])
+          }
+        }
+        list_vals[[length(list_vals) + 1]] =
+          c(iter = i,
+            look = lk,
+            unlist(f_s_a),
+            unlist(obs_per_it[[lk]]),
+            f_test(samples))
+      }
     }
   }
   close(pb)
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look),]
+  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look), ]
   for (c_nam in names(n_obs)) {
     class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
   }
@@ -88,7 +92,7 @@ get_pow = function(p_values, alpha = 0.05) {
     }
   }
   mlook = max(p_values$look)
-  row1 = p_values[p_values$look == mlook,][1,]
+  row1 = p_values[p_values$look == mlook, ][1, ]
   msamp = sum(row1[n_cols])
 
   cat(
@@ -139,10 +143,10 @@ get_pow = function(p_values, alpha = 0.05) {
   stops = list()
   for (lk in looks) {
     iters_out0 = ps_sub0$iter[ps_sub0$look == lk & ps_sub0$p_h0 < a_adj]
-    ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0,]
+    ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0, ]
     iters_out1 = ps_sub1$iter[ps_sub1$look == lk &
                                 ps_sub1$p_h1 < a_adj]
-    ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1,]
+    ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1, ]
 
     stops[[length(stops) + 1]] = c(
       look = lk,
@@ -225,10 +229,8 @@ custom_test = function(sampl) {
   )
 }
 
-f_s_args = list(
-  h1_mean = c(0.5, 1, 1.5),
-  h1_sd = c(1, 1.5)
-)
+f_s_args = list(h1_mean = c(0.5, 1, 1.5),
+                h1_sd = c(1, 1.5))
 
 
 
