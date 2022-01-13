@@ -2,11 +2,21 @@
 
 # simulation procedure to get p values
 sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
+  if (!is.function(f_sample)) {
+    f_s_args = f_sample
+    if (!is.function(f_s_args[[1]])) {
+      stop('When "f_sample" is given as list,',
+           ' the first argument must be a function.')
+    }
+    f_sample = f_s_args[[1]]
+    f_s_args[[1]] = NULL
+  }
   if (is.atomic(n_obs)) {
     # if vector given, all samples equal
     n_obs_orig = n_obs
     n_obs = list()
-    for (n_name in formalArgs(f_sample)) {
+    fpars = formalArgs(f_sample)
+    for (n_name in fpars[!fpars %in% names(f_s_args)]) {
       n_obs[[n_name]] = n_obs_orig
     }
   }
@@ -163,69 +173,83 @@ get_pow = function(p_values, alpha = 0.05) {
   print(df_stops)
 }
 
-library('gsDesign')
-gsDesign::gsDesign(k = 3, sfu = sfLDPocock, test.type = 2)
-gsDesign::gsDesign(k = 3, sfu = sfLDOF, test.type = 2)
-
-alpha = 0.025
-Kstops = 3
-z_total = qnorm(1 - alpha)
-for (k_stop in 1:Kstops) {
-  z_interim = z_total * (sqrt(Kstops / k_stop))
-  a_interim = 1 - pnorm(z_interim)
-  a_frac = k_stop / Kstops
-  a_interim_OFf = 4 * (1 - pnorm(qnorm(1 - (alpha / 4)) / (sqrt(a_frac))))
-  a_interim_Pf = alpha * log(1 + (exp(1) - 1) * a_frac)
-  message(
-    'Look #',
-    k_stop,
-    '\nO Brien and Fleming alpha: ',
-    round(a_interim, 5),
-    ', z: ',
-    round(z_interim, 5),
-    '\nO Brien and Fleming alpha with function: ',
-    round(a_interim_OFf, 5),
-    ', z: ',
-    round(qnorm(1 - a_interim_OFf), 5),
-    '\nPockock alpha with function: ',
-    round(a_interim_Pf, 5),
-    ', z: ',
-    round(qnorm(1 - a_interim_Pf), 5)
-  )
-}
 
 # user-defined function to specify sample(s)
-custom_sample =  function(v1, v2_h) {
+custom_sample1 =  function(v1, v2_h, h1_mean) {
   samples = list()
   samples$v1 = rnorm(v1, mean = 0, sd = 1)
   samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
-  samples$v2_h1 = rnorm(v2_h, mean = 0.5, sd = 1)
+  samples$v2_h1 = rnorm(v2_h, mean = h1_mean, sd = 1)
   return(samples)
 }
 
+custom_sample2 =  function(v1, v2_h, h1_mean, h1_sd) {
+  samples = list()
+  samples$v1 = rnorm(v1, mean = 0, sd = 1)
+  samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
+  samples$v2_h1 = rnorm(v2_h, mean = h1_mean, sd = h1_sd)
+  return(samples)
+}
 
 # user-defined function to specify significance test(s)
 custom_test = function(sampl) {
-  p_val0 = t.test(sampl$v1, sampl$v2_h0, var.equal = T)$p.value
-  p_val1 = t.test(sampl$v1, sampl$v2_h1, var.equal = T)$p.value
-  return(c(p_h0 = p_val0, p_h1 = p_val1))
+  t0 = t.test(sampl$v2_h0, sampl$v1, var.equal = T)
+  the_smd0 = MBESS::ci.smd(
+    ncp = t0$statistic,
+    n.1 = length(sampl$v1),
+    n.2 = length(sampl$v2_h0)
+  )
+  t1 = stats::t.test(sampl$v2_h1, sampl$v1, var.equal = T)
+  the_smd1 = MBESS::ci.smd(
+    ncp = t1$statistic,
+    n.1 = length(sampl$v1),
+    n.2 = length(sampl$v2_h1)
+  )
+  return(
+    c(
+      p_h0 = t0$p.value,
+      p_h1 = t1$p.value,
+      cohens_d_0 = as.numeric(the_smd0$smd),
+      m_diff_0 = mean(sampl$v2_h0) - mean(sampl$v1),
+      cohens_d_1 = as.numeric(the_smd1$smd),
+      m_diff_1 = mean(sampl$v2_h1) - mean(sampl$v1)
+    )
+  )
 }
 
-# set.seed(2022)
 
 # run simulation
+# varied parameters
+df_ps = sim_pvals(
+  f_sample = list(
+    custom_sample,
+    h1_mean = c(0.5, 1, 1.5),
+    h1_sd = c(1, 1.5)
+  ),
+  n_obs = c(30, 60, 90),
+  f_test = custom_test,
+  n_obs = list(),
+  n_iter = 1000
+)
+
+# unvaried 1
 df_ps = sim_pvals(
   f_sample = custom_sample,
   n_obs = c(30, 60, 90),
   f_test = custom_test,
-  1000
+  n_iter = 1000
 )
+
+# neatStats::peek_neat(df_ps, c("cohens_d_0", "cohens_d_1"), group_by = 'look')
+# neatStats::peek_neat(df_ps, c("m_diff_0", "m_diff_1"), group_by = 'look')
+
+# unvaried 2
 df_ps = sim_pvals(
   f_sample = custom_sample,
   n_obs = list(v1 = c(30, 60, 90),
                v2_h = c(30, 60, 90)),
   f_test = custom_test,
-  10000
+  n_iter = 1000
 )
 
 # get power for conventional alpha
