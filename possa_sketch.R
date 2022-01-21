@@ -18,6 +18,7 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     }
   } else {
     f_s_a_list = NA
+    f_s_args = c()
   }
   if (is.atomic(n_obs)) {
     # if vector given, all samples equal
@@ -41,19 +42,23 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
     style = 3
   )
   obs_names = names(obs_per_it[[1]])
+  pb_count = 0
   for (f_s_a in f_s_a_list) {
-    if (is.na(f_s_a)) {
+    if (is.na(f_s_a[1])) {
       f_s_a = NULL
     }
     for (i in 1:n_iter) {
-      setTxtProgressBar(pb, i)
+      pb_count = pb_count + 1
+      setTxtProgressBar(pb, pb_count)
       samples = do.call(f_sample, c(obs_per_it[[n_look]], f_s_a))
       list_vals[[length(list_vals) + 1]] =
-        c(iter = i,
+        c(
+          iter = i,
           look = n_look,
           unlist(f_s_a),
           unlist(obs_per_it[[n_look]]),
-          f_test(samples))
+          f_test(samples)
+        )
       for (lk in (n_look - 1):1) {
         for (samp_n in obs_names) {
           if (endsWith(samp_n, '_h')) {
@@ -67,11 +72,13 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
           }
         }
         list_vals[[length(list_vals) + 1]] =
-          c(iter = i,
+          c(
+            iter = i,
             look = lk,
             unlist(f_s_a),
             unlist(obs_per_it[[lk]]),
-            f_test(samples))
+            f_test(samples)
+          )
       }
     }
   }
@@ -81,111 +88,132 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
   for (c_nam in names(n_obs)) {
     class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
   }
+  for (fc_nam in names(f_s_args)) {
+    class(df_pvals[[fc_nam]]) = c(class(df_pvals[[fc_nam]]), "possa_fac")
+  }
   class(df_pvals) = c(class(df_pvals), "possa_df")
   return(df_pvals)
 }
 
 # power calculation
-get_pow = function(p_values, alpha = 0.05) {
+get_pow = function(p_values,
+                   alpha = 0.05,
+                   group_by = NULL) {
+  if ('possa_df' %in% class(p_values)) {
+    warning(
+      'The given data frame seems not to have been created by the "possa::sim_pvals()" function; it may not fit the "possa::get_pow()" function.',
+      immediate. = TRUE
+    )
+  }
   n_cols = c()
+  fac_cols = c()
   for (c_nam in colnames(p_values)) {
     col = p_values[[c_nam]]
     if ('possa_n' %in% class(col)) {
       n_cols = c(n_cols, c_nam)
+    } else if ('possa_fac' %in% class(col)) {
+      fac_cols = c(fac_cols, c_nam)
     }
   }
-  mlook = max(p_values$look)
-  row1 = p_values[p_values$look == mlook, ][1, ]
-  msamp = sum(row1[n_cols])
-
-  cat(
-    '-- FIXED DESIGN\nN(total) = ',
-    msamp * 2,
-    '\nType I error: ',
-    mean(p_values$p_h0 < alpha),
-    '\nPower: ',
-    mean(p_values$p_h1[p_values$look == mlook] < alpha),
-    ' (cf. via pwr: ',
-    round(pwr::pwr.t.test(
-      n = msamp, sig.level = alpha, d = .5
-    )$power, 5),
-    ')\n\n',
-    sep = ''
-  )
-
-  looks = unique(p_values$look)
-
-  # df_pow = list()
-  # a_name = paste0('a_', as.character(round(a_adj * 10000)))
-
-  # The "trial and error" straircase procedure below, for getting the desired adjusted alpha, seems cumbersome and possibly unnecessary, but I can't think of a better way
-  a_adj = alpha / length(looks)
-  a_step = -0.01
-  while (abs(a_step) > 0.000002) {
-    p_values$h0_sign = p_values$p_h0 < a_adj
-    type1 = mean(aggregate(h0_sign ~ iter, data = p_values, FUN = any)$h0_sign)
-    if (round(type1, 5) == round(alpha, 5)) {
-      break
-    } else if ((type1 < alpha &&
-                a_step < 0) || (type1 > alpha && a_step > 0)) {
-      a_step = -a_step / 2
-    }
-    a_adj = a_adj + a_step
-    # cat('type1', type1, 'a_adj:', a_adj, 'new step:', a_step, fill = T)
-    cat('\r| Getting alpha: ', type1, ' (step: ', a_step, ') |    ', sep = '')
-    flush.console()
+  if (is.null(group_by)) {
+    group_by = fac_cols
+  } else if (!identical(sort(group_by), sort(fac_cols))) {
+    message('Custom "group_by" argument given. Be cautious.')
   }
-  cat('\r                                                                     ')
-  flush.console()
-  p_values$h1_sign = p_values$p_h1 < a_adj
-  seq_power = mean(aggregate(h1_sign ~ iter, data = p_values, FUN = any)$h1_sign)
+  p_values$possa_facts_combS = do.call(paste, c(p_values[group_by], sep =
+                                                  '; '))
+  for (possa_fact in unique(p_values$possa_facts_combS)) {
+    pvals_df = p_values[p_values$possa_facts_combS == possa_fact, ]
 
-  ps_sub0 = p_values
-  ps_sub1 = p_values
-  iters_tot = length(unique(p_values$iter))
-  stops = list()
-  for (lk in looks) {
-    iters_out0 = ps_sub0$iter[ps_sub0$look == lk & ps_sub0$p_h0 < a_adj]
-    ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0, ]
-    iters_out1 = ps_sub1$iter[ps_sub1$look == lk &
-                                ps_sub1$p_h1 < a_adj]
-    ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1, ]
+    mlook = max(pvals_df$look)
+    row1 = pvals_df[pvals_df$look == mlook, ][1, ]
+    msamp = sum(row1[n_cols])
 
-    stops[[length(stops) + 1]] = c(
-      look = lk,
-      ratio_h0 = length(iters_out0) / iters_tot,
-      ratio_h1 = length(iters_out1) / iters_tot
+    cat(
+      '-- FIXED DESIGN\nN(total) = ',
+      msamp * 2,
+      '\nType I error: ',
+      mean(pvals_df$p_h0 < alpha),
+      '\nPower: ',
+      mean(pvals_df$p_h1[pvals_df$look == mlook] < alpha),
+      '\n\n',
+      sep = ''
     )
-  }
-  stops[[length(stops) + 1]]  = c(
-    look = -1,
-    ratio_h0 = nrow(ps_sub0) / iters_tot / length(looks),
-    ratio_h1 = nrow(ps_sub1) / iters_tot / length(looks)
-  )
-  df_stops = as.data.frame(do.call(rbind, stops))
-  df_stops$samples = c(unique(p_values$n), msamp)
-  df_stops$avg_0 = df_stops$ratio_h0 * df_stops$samples
-  df_stops$avg_1 = df_stops$ratio_h1 * df_stops$samples
-  df_stops = rbind(df_stops, colSums(df_stops))
-  dflen = nrow(df_stops)
-  df_stops$look[dflen - 1] = 'remains'
-  df_stops$look[dflen] = 'totals'
 
-  cat(
-    '-- SEQUENTIAL DESIGN\nN(total-avg) = ',
-    df_stops$avg_0[dflen] * 2,
-    ' (if H0 true) or ',
-    df_stops$avg_1[dflen] * 2,
-    ' (if H1 true)\nType I error: ',
-    type1,
-    '\nAdjusted (constant) local alpha: ',
-    as.character(round(a_adj, 5)),
-    '\nPower: ',
-    seq_power,
-    '\n\n',
-    sep = ''
-  )
-  print(df_stops)
+    looks = unique(pvals_df$look)
+
+    # df_pow = list()
+    # a_name = paste0('a_', as.character(round(a_adj * 10000)))
+
+    # The "trial and error" straircase procedure below, for getting the desired adjusted alpha, seems cumbersome and possibly unnecessary, but I can't think of a better way
+    a_adj = alpha / length(looks)
+    a_step = -0.01
+    while (abs(a_step) > 0.000002) {
+      pvals_df$h0_sign = pvals_df$p_h0 < a_adj
+      type1 = mean(aggregate(h0_sign ~ iter, data = pvals_df, FUN = any)$h0_sign)
+      if (round(type1, 5) == round(alpha, 5)) {
+        break
+      } else if ((type1 < alpha &&
+                  a_step < 0) || (type1 > alpha && a_step > 0)) {
+        a_step = -a_step / 2
+      }
+      a_adj = a_adj + a_step
+      # cat('type1', type1, 'a_adj:', a_adj, 'new step:', a_step, fill = T)
+      cat('\r| Getting alpha: ', type1, ' (step: ', a_step, ') |    ', sep = '')
+      flush.console()
+    }
+    cat('\r                                                                     ')
+    flush.console()
+    pvals_df$h1_sign = pvals_df$p_h1 < a_adj
+    seq_power = mean(aggregate(h1_sign ~ iter, data = pvals_df, FUN = any)$h1_sign)
+
+    ps_sub0 = pvals_df
+    ps_sub1 = pvals_df
+    iters_tot = length(unique(pvals_df$iter))
+    stops = list()
+    for (lk in looks) {
+      iters_out0 = ps_sub0$iter[ps_sub0$look == lk & ps_sub0$p_h0 < a_adj]
+      ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0, ]
+      iters_out1 = ps_sub1$iter[ps_sub1$look == lk &
+                                  ps_sub1$p_h1 < a_adj]
+      ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1, ]
+
+      stops[[length(stops) + 1]] = c(
+        look = lk,
+        ratio_h0 = length(iters_out0) / iters_tot,
+        ratio_h1 = length(iters_out1) / iters_tot
+      )
+    }
+    stops[[length(stops) + 1]]  = c(
+      look = -1,
+      ratio_h0 = nrow(ps_sub0) / iters_tot / length(looks),
+      ratio_h1 = nrow(ps_sub1) / iters_tot / length(looks)
+    )
+    df_stops = as.data.frame(do.call(rbind, stops))
+    df_stops$samples = c(unique(pvals_df$n), msamp)
+    df_stops$avg_0 = df_stops$ratio_h0 * df_stops$samples
+    df_stops$avg_1 = df_stops$ratio_h1 * df_stops$samples
+    df_stops = rbind(df_stops, colSums(df_stops))
+    dflen = nrow(df_stops)
+    df_stops$look[dflen - 1] = 'remains'
+    df_stops$look[dflen] = 'totals'
+
+    cat(
+      '-- SEQUENTIAL DESIGN\nN(total-avg) = ',
+      df_stops$avg_0[dflen] * 2,
+      ' (if H0 true) or ',
+      df_stops$avg_1[dflen] * 2,
+      ' (if H1 true)\nType I error: ',
+      type1,
+      '\nAdjusted (constant) local alpha: ',
+      as.character(round(a_adj, 5)),
+      '\nPower: ',
+      seq_power,
+      '\n\n',
+      sep = ''
+    )
+    print(df_stops)
+  }
 }
 
 
@@ -243,7 +271,7 @@ df_ps = sim_pvals(
   ),
   n_obs = c(30, 60, 90),
   f_test = custom_test,
-  n_iter = 1000
+  n_iter = 100
 )
 
 # unvaried 1
@@ -256,6 +284,8 @@ df_ps = sim_pvals(
 
 # neatStats::peek_neat(df_ps, c("cohens_d_0", "cohens_d_1"), group_by = 'look')
 # neatStats::peek_neat(df_ps, c("m_diff_0", "m_diff_1"), group_by = 'look')
+
+neatStats::peek_neat(df_ps, c("m_diff_0", "m_diff_1"), group_by = c('h1_mean'))
 
 # unvaried 2
 df_ps = sim_pvals(
