@@ -1,7 +1,12 @@
 # A first sketch for Power Simulation for Sequential Analysis
 
 # simulation procedure to get p values
-sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
+sim_pvals = function(f_sample,
+                     n_obs,
+                     f_test,
+                     n_iter = 1000,
+                     seed = 8) {
+  set.seed(seed)
   if (!is.function(f_sample)) {
     f_s_args = f_sample
     if (!is.function(f_s_args[[1]])) {
@@ -60,13 +65,16 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
           f_test(samples)
         )
       for (lk in (n_look - 1):1) {
+        seed = .Random.seed
         for (samp_n in obs_names) {
           if (endsWith(samp_n, '_h')) {
             for (h_num in c('0', '1')) {
+              .Random.seed = seed
               samples[[paste0(samp_n, h_num)]] = sample(samples[[paste0(samp_n, h_num)]],
                                                         obs_per_it[[lk]][[samp_n]])
             }
           } else {
+            .Random.seed = seed
             samples[[samp_n]] = sample(samples[[samp_n]],
                                        obs_per_it[[lk]][[samp_n]])
           }
@@ -97,8 +105,10 @@ sim_pvals = function(f_sample, n_obs, f_test, n_iter = 1000) {
 
 # power calculation
 get_pow = function(p_values,
-                   alpha = 0.05,
-                   group_by = NULL) {
+                   alpha_locals = NULL,
+                   alpha_global = 0.05,
+                   group_by = NULL,
+                   round_to = 3) {
   if ('possa_df' %in% class(p_values)) {
     warning(
       'The given data frame seems not to have been created by the "possa::sim_pvals()" function; it may not fit the "possa::get_pow()" function.',
@@ -107,38 +117,79 @@ get_pow = function(p_values,
   }
   n_cols = c()
   fac_cols = c()
+  p_names = c()
   for (c_nam in colnames(p_values)) {
     col = p_values[[c_nam]]
     if ('possa_n' %in% class(col)) {
       n_cols = c(n_cols, c_nam)
     } else if ('possa_fac' %in% class(col)) {
       fac_cols = c(fac_cols, c_nam)
+    } else if (startsWith(c_nam, 'p_') && endsWith(c_nam, '_h0')) {
+      pnam = substr(c_nam, 1, nchar(c_nam) - 3)
+      if (paste0(pnam, '_h1') %in% colnames(p_values)) {
+        p_names = c(p_names, pnam)
+      }
     }
+  }
+  if (!is.null(alpha_locals)) {
+    if (is.atomic(n_obs)) {
+      loc_pnames = alpha_locals
+    } else {
+      loc_pnames = names(alpha_locals)
+    }
+    for (pname in loc_pnames) {
+      if (!pname %in% p_names) {
+        stop('There is no column name pair "',
+             pname,
+             '0"/"',
+             pname,
+             '1".')
+      }
+    }
+    p_names = loc_pnames
   }
   if (is.null(group_by)) {
     group_by = fac_cols
   } else if (!identical(sort(group_by), sort(fac_cols))) {
     message('Custom "group_by" argument given. Be cautious.')
   }
-  p_values$possa_facts_combS = do.call(paste, c(p_values[group_by], sep =
-                                                  '; '))
-  for (possa_fact in unique(p_values$possa_facts_combS)) {
-    pvals_df = p_values[p_values$possa_facts_combS == possa_fact, ]
-
+  if ((!is.null(group_by)) & length(group_by) > 0) {
+    p_values$possa_facts_combS = do.call(paste, c(p_values[group_by], sep =
+                                                    '; '))
+    possafacts = unique(p_values$possa_facts_combS)
+  } else {
+    possafacts = NA
+  }
+  out_dfs = list()
+  for (possa_fact in possafacts) {
+    if (is.na(possafacts)) {
+      pvals_df = p_values
+    } else {
+      pvals_df = p_values[p_values$possa_facts_combS == possa_fact, ]
+      cat('Group: ', possa_fact, fill = TRUE)
+    }
     mlook = max(pvals_df$look)
     row1 = pvals_df[pvals_df$look == mlook, ][1, ]
     msamp = sum(row1[n_cols])
 
-    cat(
-      '-- FIXED DESIGN\nN(total) = ',
-      msamp * 2,
-      '\nType I error: ',
-      mean(pvals_df$p_h0 < alpha),
-      '\nPower: ',
-      mean(pvals_df$p_h1[pvals_df$look == mlook] < alpha),
-      '\n\n',
-      sep = ''
-    )
+    pvals_df_fix = pvals_df[pvals_df$look == mlook, ]
+    cat('-- FIXED DESIGN; N(total) =',
+        msamp, '--', fill = TRUE)
+    for (p_nam in p_names) {
+      cat(
+        '(',
+        p_nam,
+        ') Type I error: ',
+        round(mean(pvals_df_fix[[paste0(p_nam, '_h0')]] < alpha), round_to),
+        '; Power: ',
+        round(mean(pvals_df_fix[[paste0(p_nam, '_h1')]] < alpha), round_to),
+        '\n\n',
+        sep = '',
+        fill = TRUE
+      )
+    }
+
+    # getting vector from cols: unlist(pvals_df[p_h0_names], use.names = FALSE)
 
     looks = unique(pvals_df$look)
 
@@ -199,7 +250,7 @@ get_pow = function(p_values,
     df_stops$look[dflen] = 'totals'
 
     cat(
-      '-- SEQUENTIAL DESIGN\nN(total-avg) = ',
+      '-- SEQUENTIAL DESIGN --\nN(total-avg) = ',
       df_stops$avg_0[dflen] * 2,
       ' (if H0 true) or ',
       df_stops$avg_1[dflen] * 2,
@@ -213,16 +264,21 @@ get_pow = function(p_values,
       sep = ''
     )
     print(df_stops)
+    out_dfs[[length(out_dfs) + 1]] = df_stops
   }
+  if (is.na(possafacts)) {
+    out_dfs = out_dfs[[1]]
+  }
+  invisible(out_dfs)
 }
 
 
 # user-defined function to specify sample(s)
-custom_sample1 = function(v1, v2_h, h1_mean) {
+custom_sample1 = function(v1, v2_h) {
   samples = list()
   samples$v1 = rnorm(v1, mean = 0, sd = 1)
   samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
-  samples$v2_h1 = rnorm(v2_h, mean = h1_mean, sd = 1)
+  samples$v2_h1 = rnorm(v2_h, mean = 1, sd = 1)
   return(samples)
 }
 
