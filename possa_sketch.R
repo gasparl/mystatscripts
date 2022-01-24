@@ -116,6 +116,8 @@ get_pow = function(p_values,
       immediate. = TRUE
     )
   }
+  looks = unique(pvals_df$look)
+  mlook = max(pvals_df$look)
   n_cols = c()
   fac_cols = c()
   p_names = c()
@@ -132,10 +134,37 @@ get_pow = function(p_values,
       }
     }
   }
+  a_locals = list()
+  # extract (if given) predetermined local alphas and/or specified p value columns
   if (!is.null(alpha_locals)) {
-    if (is.atomic(n_obs)) {
+    if (is.atomic(alpha_locals) && is.character(alpha_locals)) {
+      if (!length(alpha_locals) == mlook) {
+        stop(
+          'Wrong argument for "alpha_locals". (If a numeric vector is given, ',
+          'it must have same length as the maximum number of looks (in this case ',
+          mlook,
+          ').)'
+        )
+      }
+      for (pnam in p_names) {
+        a_locals[[pnam]] = alpha_locals
+      }
+    }
+    if (is.atomic(alpha_locals)) {
       loc_pnames = alpha_locals
     } else {
+      for (a_vec in alpha_locals) {
+        if (!(is.atomic(a_vec) && length(a_vec) == mlook)) {
+          stop(
+            'Wrong argument for "alpha_locals". (If a list is given, ',
+            'it must consist of one or more vectors of numbers with the',
+            ' same length as the maximum number of looks (in this case ',
+            mlook,
+            ').)'
+          )
+        }
+        a_locals = alpha_locals
+      }
       loc_pnames = names(alpha_locals)
     }
     for (pname in loc_pnames) {
@@ -148,6 +177,12 @@ get_pow = function(p_values,
       }
     }
     p_names = loc_pnames
+  }
+  # if not given, add NA for all local alphas
+  if (length(a_locals) > 0) {
+    for (pnam in p_names) {
+      a_locals[[pnam]] = rep(NA, mlook)
+    }
   }
   if (is.null(group_by)) {
     group_by = fac_cols
@@ -162,7 +197,6 @@ get_pow = function(p_values,
     possafacts = NA
   }
   out_dfs = list()
-  looks = unique(pvals_df$look)
   for (possa_fact in possafacts) {
     if (is.na(possafacts)) {
       pvals_df = p_values
@@ -170,7 +204,6 @@ get_pow = function(p_values,
       pvals_df = p_values[p_values$possa_facts_combS == possa_fact,]
       cat('Group: ', possa_fact, fill = TRUE)
     }
-    mlook = max(pvals_df$look)
     row1 = pvals_df[pvals_df$look == mlook,][1,]
     msamp = sum(row1[n_cols])
 
@@ -197,8 +230,7 @@ get_pow = function(p_values,
 
     # the "trial and error" straircase procedure below, for getting the desired adjusted alpha, seems cumbersome and possibly unnecessary, but I can't think of a better way
 
-    locals = 999999999999 #TODO
-    locls_temp = locals
+    locls_temp = a_locals
     a_adj = alpha / length(looks)
     a_step = -0.01
     for (p_nam in p_names) {
@@ -210,13 +242,14 @@ get_pow = function(p_values,
     while (abs(a_step) > 0.000002) {
       # calculate significances (T/F) based on adjusted alpha
       for (p_nam in p_names) {
-        locls_temp[[p_nam]][is.na(locals[[p_nam]])] = a_adj
+        locls_temp[[p_nam]][is.na(a_locals[[p_nam]])] = a_adj
         for (lk in 1:mlook) {
           pvals_df[[paste0(p_nam, '_h0_sign')]][pvals_df$look == lk] =
             pvals_df[[paste0(p_nam, '_h0')]][pvals_df$look == lk] < locls_temp[[p_nam]][lk]
         }
       }
       # now check the global type 1 error
+      # TODO: include futility bounds
       if (length(p_names) > 1) {
         # if multiple p columns, check at which look we stop
         pvals_df$h0_stoP = do.call(multi_logic, c(pvals_df[p_h0_sign_names]))
@@ -227,7 +260,7 @@ get_pow = function(p_values,
         ), function(x) {
           return(x[which.min(x$look), ])
         }))
-        # now get all outcomes from at stopping point
+        # now get all outcomes at stopping point
         type1 = mean(unlist(pvals_df_stp[p_h0_sign_names], use.names = FALSE))
       } else {
         type1 = mean(aggregate(pvals_df[[p_h0_sign_names]] ~ pvals_df$iter, FUN = any)[[p_h0_sign_names]])
@@ -236,7 +269,8 @@ get_pow = function(p_values,
       # otherwise continue the staircase
       if (round(type1, 5) == round(alpha, 5)) {
         break
-      } else if ((type1 < alpha && # change staircase direction if needed
+      } else if ((type1 < alpha &&
+                  # change staircase direction if needed
                   a_step < 0) || (type1 > alpha && a_step > 0)) {
         a_step = -a_step / 2 # whenever changing direction, also halve the step
       }
