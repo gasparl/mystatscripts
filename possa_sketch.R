@@ -1,5 +1,9 @@
 # A first sketch for Power Simulation for Sequential Analysis
 
+rowise =  function(datcols, func) {
+  return(apply(do.call(cbind, args = datcols), 1, func))
+}
+
 # simulation procedure to get p values
 sim_pvals = function(f_sample,
                      n_obs,
@@ -109,6 +113,8 @@ get_pow = function(p_values,
                    alpha_global = 0.05,
                    fut_locals = NULL,
                    group_by = NULL,
+                   descr_cols = TRUE,
+                   descr_func = summary,
                    round_to = 3,
                    multi_logic = all,
                    multi_logic_fut = all,
@@ -116,14 +122,14 @@ get_pow = function(p_values,
                    # default: 11 steps from 0.01, decreasing by halves
                    # check: formatC(staircase_steps, digits = 12, format = "f")
                    alpha_precision = 5) {
-  if ('possa_df' %in% class(p_values)) {
+  if (!'possa_df' %in% class(p_values)) {
     warning(
       'The given data frame seems not to have been created by the "possa::sim_pvals()" function; it may not fit the "possa::get_pow()" function.',
       immediate. = TRUE
     )
   }
-  looks = unique(pvals_df$look)
-  mlook = max(pvals_df$look)
+  looks = unique(p_values$look)
+  mlook = max(p_values$look)
   # get columns with sample sizes (n), factors (fac), and p values (p_/_h0/1)
   n_cols = c()
   fac_cols = c()
@@ -262,28 +268,52 @@ get_pow = function(p_values,
   } else {
     possafacts = NA
   }
+  p_names_h0 = paste0(p_names, '_h0')
+  p_names_h1 = paste0(p_names, '_h1')
+  if (descr_cols[1] == TRUE) {
+    descr_cols = names(p_values)[!names(p_values) %in%
+                                   c('iter', 'look', p_names_h0, p_names_h1, n_cols, fac_cols)]
+  }
   out_dfs = list()
+  # calculate results separately for each factor combination
   for (possa_fact in possafacts) {
     if (is.na(possafacts)) {
       pvals_df = p_values
     } else {
+      # print descriptives of all included
+      if (descr_cols[1] != FALSE && possa_fact == possafacts[1]) {
+        cat('-- DESCRIPTIVES (total) --', fill = TRUE)
+        for (desc_col in descr_cols) {
+          cat(desc_col, ': ', sep = '')
+          descr_func(p_values[[desc_col]])
+        }
+      }
+      # if applicable, take only given factor combination & print its "group" name
       pvals_df = p_values[p_values$possa_facts_combS == possa_fact, ]
-      cat('Group: ', possa_fact, fill = TRUE)
+      cat('GROUP: ', possa_fact, fill = TRUE)
     }
-    row1 = pvals_df[pvals_df$look == mlook, ][1, ]
-    msamp = sum(row1[n_cols])
-
+    if (descr_cols[1] != FALSE) {
+      cat('-- DESCRIPTIVES --', fill = TRUE)
+      for (desc_col in descr_cols) {
+        cat(desc_col, ': ', sep = '', fill = TRUE)
+        print(descr_func(pvals_df[[desc_col]]))
+      }
+    }
+    tot_samples = c()
+    for (lk in looks) {
+      tot_samples = c(tot_samples, sum(pvals_df[pvals_df$look == lk,][1,][n_cols]))
+    }
     pvals_df_fix = pvals_df[pvals_df$look == mlook, ]
     cat('-- FIXED DESIGN; N(total) =',
-        msamp, '--', fill = TRUE)
+        tot_samples[length(tot_samples)], '--', fill = TRUE)
     for (p_nam in p_names) {
       cat(
         '(',
         p_nam,
         ') Type I error: ',
-        round(mean(pvals_df_fix[[paste0(p_nam, '_h0')]] < alpha), round_to),
+        round(mean(pvals_df_fix[[paste0(p_nam, '_h0')]] < alpha_global), round_to),
         '; Power: ',
-        round(mean(pvals_df_fix[[paste0(p_nam, '_h1')]] < alpha), round_to),
+        round(mean(pvals_df_fix[[paste0(p_nam, '_h1')]] < alpha_global), round_to),
         '\n\n',
         sep = '',
         fill = TRUE
@@ -292,109 +322,185 @@ get_pow = function(p_values,
 
     # the "trial and error" straircase procedure below, for getting the desired adjusted alpha, seems cumbersome and possibly unnecessary, but I can't think of a better way
     locls_temp = a_locals
-    a_adj = alpha / length(looks) # start with bonferroni
-    a_step = -staircase_steps[1] # initial alpha-decreasing step
-    staircase_steps = staircase_steps[-1]
-    for (p_nam in p_names) {
-      pvals_df[paste0(p_nam, '_h0')] = NA
-      pvals_df[paste0(p_nam, '_h1')] = NA
-    }
+    a_adj = alpha_global / length(looks) # start with bonferroni
+    strair_steps = staircase_steps
+    a_step = -strair_steps[1] # initial alpha-decreasing step
+    strair_steps = strair_steps[-1]
     p_h0_sign_names = paste0(p_names, '_h0_sign')
     p_h0_fut_names = paste0(p_names, '_h0_fut')
-    p_h1_names = paste0(p_names, '_h1')
+    p_h1_sign_names = paste0(p_names, '_h1_sign')
+    p_h1_fut_names = paste0(p_names, '_h1_fut')
     pb = utils::txtProgressBar(
       min = 0,
-      max = length(staircase_steps),
+      max = length(strair_steps),
       initial = 0,
       style = 3
     )
-    while (abs(a_step) > min_step) {
-      # calculate significances (T/F) based on adjusted alpha
+    while (length(strair_steps) > 0) {
+      # calculate H0 significances (T/F) based on adjusted alpha
       for (p_nam in p_names) {
-        locls_temp[[p_nam]][is.na(a_locals[[p_nam]])] = a_adj
-        pvals_df[[paste0(p_nam, '_h0_sign')]] = NA
+        locls_temp[[p_nam]][is.na(a_locals[[p_nam]])] = a_adj # adjust alpha where missing
+        pvals_df[[paste0(p_nam, '_h0_sign')]] = NA # create sign column for given p
         if (!is.null(fut_locals)) {
-          pvals_df[[paste0(p_nam, '_h0_fut')]] = TRUE
+          # if futility bounds are given
+          pvals_df[[paste0(p_nam, '_h0_fut')]] = NA # create fut column for given p
         }
         for (lk in 1:mlook) {
+          # decide significance at given look for given p
           pvals_df[[paste0(p_nam, '_h0_sign')]][pvals_df$look == lk] =
             pvals_df[[paste0(p_nam, '_h0')]][pvals_df$look == lk] < locls_temp[[p_nam]][lk]
-          if (!is.null(fut_locals) && lk != mlook) {
+          if (!is.null(fut_locals)) {
             pvals_df[[paste0(p_nam, '_h0_fut')]][pvals_df$look == lk] =
               pvals_df[[paste0(p_nam, '_h0')]][pvals_df$look == lk] > fa_locals[[p_nam]][lk]
           }
         }
       }
       # now check the global type 1 error
-      if (length(p_names) > 1 || (!is.null(fut_locals))) {
-        # if multiple p columns, check at which look we stop
-        pvals_df$h0_stoP = do.call(multi_logic, c(pvals_df[c(p_h0_sign_names)]))
-        if (!is.null(fut_locals)) {
-          pvals_df$h0_stoP_fa = do.call(multi_logic_fut, c(pvals_df[c(p_h0_fut_names)]))
-          pvals_df$h0_stoP = any(pvals_df$h0_stoP, pvals_df$h0_stoP_fa)
-        }
-        pvals_df$h0_stoP[pvals_df$look == mlook] = TRUE
-        pvals_df_stp = pvals_df[pvals_df$h0_stoP == TRUE, ]
-        pvals_df_stp = do.call(rbind, lapply(split(
-          pvals_df_stp, as.factor(pvals_df_stp$iter)
-        ), function(x) {
-          return(x[which.min(x$look),])
-        }))
-        # now get all outcomes at stopping point
-        type1 = mean(unlist(pvals_df_stp[p_h0_sign_names], use.names = FALSE))
-      } else {
-        type1 = mean(aggregate(pvals_df[[p_h0_sign_names]] ~ pvals_df$iter, FUN = any)[[p_h0_sign_names]])
+      # if multiple p columns, check at which look we stop
+      pvals_df$h0_stoP = rowise(pvals_df[c(p_h0_sign_names)], multi_logic)
+      if (!is.null(fut_locals)) {
+        pvals_df$h0_stoP_fa = multi_logic(pvals_df[c(p_h0_fut_names)], multi_logic_fut)
+        pvals_df$h0_stoP = any(pvals_df$h0_stoP, pvals_df$h0_stoP_fa)
       }
+      pvals_df_stp = pvals_df[pvals_df$h0_stoP == TRUE |
+                                pvals_df$look == mlook, ]
+      pvals_df_stp = do.call(rbind, lapply(split(
+        pvals_df_stp, as.factor(pvals_df_stp$iter)
+      ), function(x) {
+        return(x[which.min(x$look),])
+      }))
+      # now get all outcomes at stopping point
+      type1 = mean(unlist(pvals_df_stp[p_h0_sign_names], use.names = FALSE))
+
       # break if global alpha is correct
       # otherwise continue the staircase
-      if (round(type1, alpha_precision) == round(alpha, alpha_precision)) {
+      if (round(type1, alpha_precision) == round(alpha_global, alpha_precision)) {
         break
-      } else if ((type1 < alpha &&
-                  a_step < 0) || (type1 > alpha && a_step > 0)) {
+      } else if ((type1 < alpha_global &&
+                  a_step < 0) ||
+                 (type1 > alpha_global && a_step > 0)) {
         # change staircase direction (and also decrease step) if needed
-        a_step = -staircase_steps[1]
-        staircase_steps = staircase_steps[-1]
+        a_step = -strair_steps[1]
+        strair_steps = strair_steps[-1]
         setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
       }
       a_adj = a_adj + a_step
       cat('type1', type1, 'a_adj:', a_adj, 'new step:', a_step, fill = T)
     }
     close(pb)
-    ##### TODO: here onward, futility, etc
-    for (lk in 1:mlook) {
-      pvals_df$h1_sign[pvals_df$look == lk] = pvals_df$p_h1[pvals_df$look == lk] < locls_temp[lk]
+    a_locals = locls_temp
+    # calculate H1 significances (T/F) based on adjusted alpha
+    for (p_nam in p_names) {
+      pvals_df[[paste0(p_nam, '_h1_sign')]] = NA
+      if (!is.null(fut_locals)) {
+        pvals_df[[paste0(p_nam, '_h1_fut')]] = NA
+      }
+      for (lk in 1:mlook) {
+        pvals_df[[paste0(p_nam, '_h1_sign')]][pvals_df$look == lk] =
+          pvals_df[[paste0(p_nam, '_h1')]][pvals_df$look == lk] < a_locals[[p_nam]][lk]
+        if (!is.null(fut_locals)) {
+          pvals_df[[paste0(p_nam, '_h1_fut')]][pvals_df$look == lk] =
+            pvals_df[[paste0(p_nam, '_h1')]][pvals_df$look == lk] > fa_locals[[p_nam]][lk]
+        }
+      }
     }
-    seq_power = mean(aggregate(h1_sign ~ iter, data = pvals_df, FUN = any)$h1_sign)
+    # now check the power
+    # if multiple p columns, check at which look we stop
+
+    pvals_df$h1_stoP = rowise(pvals_df[c(p_h1_sign_names)], multi_logic)
+    if (!is.null(fut_locals)) {
+      pvals_df$h1_stoP_fa = rowise(pvals_df[c(p_h1_fut_names)], multi_logic_fut)
+      pvals_df$h1_stoP = any(pvals_df$h1_stoP, pvals_df$h1_stoP_fa)
+    }
+    pvals_df_stp = pvals_df[pvals_df$h1_stoP == TRUE |
+                              pvals_df$look == mlook, ]
+    pvals_df_stp = do.call(rbind, lapply(split(
+      pvals_df_stp, as.factor(pvals_df_stp$iter)
+    ), function(x) {
+      return(x[which.min(x$look),])
+    }))
+    # now get all outcomes at stopping point
+    seq_power = mean(unlist(pvals_df_stp[p_h1_sign_names], use.names = FALSE))
+
+    # calculate sample size information per look
     ps_sub0 = pvals_df
     ps_sub1 = pvals_df
     iters_tot = length(unique(pvals_df$iter))
     stops = list()
+    previous_h0 = iters_tot
+    previous_h1 = iters_tot
     for (lk in looks) {
-      iters_out0 = ps_sub0$iter[ps_sub0$look == lk & ps_sub0$p_h0 < a_adj]
-      ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0, ]
-      iters_out1 = ps_sub1$iter[ps_sub1$look == lk &
-                                  ps_sub1$p_h1 < a_adj]
-      ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1, ]
-
-      stops[[length(stops) + 1]] = c(
-        look = lk,
-        ratio_h0 = length(iters_out0) / iters_tot,
-        ratio_h1 = length(iters_out1) / iters_tot
-      )
+      iters_out0 = ps_sub0[ps_sub0$look == lk &
+                             ps_sub0$h0_stoP == TRUE, ]
+      ps_sub0 = ps_sub0[!ps_sub0$iter %in% iters_out0$iter,]
+      iters_out1 = ps_sub1[ps_sub1$look == lk &
+                             ps_sub1$h1_stoP == TRUE, ]
+      ps_sub1 = ps_sub1[!ps_sub1$iter %in% iters_out1$iter, ]
+      outs = c()
+      for (p_nam in p_names) {
+        outs[paste0('iters_sign_', p_nam, '_h0')] =
+          sum(iters_out0[[paste0(p_nam, '_h0_sign')]])
+        outs[paste0('iters_sign_', p_nam, '_h1')] =
+          sum(iters_out1[[paste0(p_nam, '_h1_sign')]])
+        if (!is.null(fut_locals)) {
+          outs[paste0('iters_futil_', p_nam, '_h0')] =
+            sum(iters_out1[[paste0(p_nam, '_h0_fut')]])
+          outs[paste0('iters_futil_', p_nam, '_h1')] =
+            sum(iters_out1[[paste0(p_nam, '_h1_fut')]])
+        }
+      }
+      outs['iters_remain_h0'] =
+        length(unique(ps_sub0$iter))
+      outs['iters_remain_h1'] =
+        length(unique(ps_sub1$iter))
+      if (lk == mlook) {
+        # at last look, all is stopped that previously remained
+        outs['iters_stopped_h0'] = previous_h0
+        outs['iters_stopped_h1'] = previous_h1
+      } else {
+        outs['iters_stopped_h0'] = previous_h0 - outs['iters_remain_h0']
+        outs['iters_stopped_h1'] = previous_h1 - outs['iters_remain_h1']
+      }
+      stops[[length(stops) + 1]] = c(look = lk,
+                                     sample = tot_samples[lk],
+                                     outs)
+      previous_h0 = outs['iters_remain_h0']
+      previous_h1 = outs['iters_remain_h1']
     }
-    stops[[length(stops) + 1]]  = c(
-      look = -1,
-      ratio_h0 = nrow(ps_sub0) / iters_tot / length(looks),
-      ratio_h1 = nrow(ps_sub1) / iters_tot / length(looks)
-    )
     df_stops = as.data.frame(do.call(rbind, stops))
-    df_stops$samples = c(unique(pvals_df$n), msamp)
-    df_stops$avg_0 = df_stops$ratio_h0 * df_stops$samples
-    df_stops$avg_1 = df_stops$ratio_h1 * df_stops$samples
+
+    # df_stops = df_stps # TO REMOVE
+
+    for (pnam in p_names) {
+      df_stops[paste0('alpha_local_', p_nam)] = a_locals[[pnam]]
+      if (!is.null(fut_locals)) {
+        df_stops[paste0('futil_local_', p_nam)] = fa_locals[[pnam]]
+      }
+      for (h01 in c('_h0', '_h1')) {
+        df_stops[paste0('ratio_sign_', p_nam, h01)] = df_stops[paste0('iters_sign_', p_nam, h01)] / iters_tot
+        if (!is.null(fut_locals)) {
+          df_stops[paste0('ratio_futil_', p_nam, h01)] = df_stops[paste0('iters_futil_', p_nam, h01)] / iters_tot
+        }
+      }
+    }
+    df_stops$ratio_stopped_h0 = df_stops$iters_stopped_h0 / iters_tot
+    df_stops$ratio_stopped_h1 = df_stops$iters_stopped_h1 / iters_tot
+    df_stops$ratio_remain_h0 = df_stops$iters_remain_h0 / iters_tot
+    df_stops$ratio_remain_h1 = df_stops$iters_remain_h1 / iters_tot
+    # the average sample proportion at the given look
+    df_stops$samp_avg_prop_0 = df_stops$ratio_stopped_h0 * df_stops$sample
+    df_stops$samp_avg_prop_1 = df_stops$ratio_stopped_h1 * df_stops$sample
+
     df_stops = rbind(df_stops, colSums(df_stops))
-    dflen = nrow(df_stops)
-    df_stops$look[dflen - 1] = 'remains'
-    df_stops$look[dflen] = 'totals'
+    df_stops$look[nrow(df_stops)] = 'totals'
+
+    ############################################################
+    # somehow calculate type 1 & power
+
+    ### PER GROUND TRUTH (H0 & H1) & PER P VALUE (P-NAME)
+    # overall type 1 error
+    # overall power
+
 
     cat(
       '-- SEQUENTIAL DESIGN --\nN(total-avg) = ',
@@ -464,6 +570,12 @@ custom_test = function(sampl) {
 }
 
 
+# saveRDS(df_ps, "df_ps_example.rds")
+# df_ps = readRDS("df_ps_example.rds")
+
+# saveRDS(df_stops, "dat_temp.rds")
+# df_stps = readRDS("dat_temp.rds")
+
 # run simulation ####
 # varied parameters
 df_ps = sim_pvals(
@@ -479,7 +591,7 @@ df_ps = sim_pvals(
 
 # unvaried 1
 df_ps = sim_pvals(
-  f_sample = custom_sample,
+  f_sample = custom_sample1,
   n_obs = c(30, 60, 90),
   f_test = custom_test,
   n_iter = 1000
@@ -500,10 +612,10 @@ df_ps = sim_pvals(
 )
 
 # get power for conventional alpha
-get_pow(df_ps, alpha = .05)
+get_pow(df_ps)
 
 # again for small alpha
-get_pow(df_ps, alpha = .001)
+get_pow(df_ps, alpha_global = .001)
 
 # at the moment it's probably senselessly precise
-get_pow(df_ps, alpha = .1735)
+get_pow(df_ps, alpha_global = .1735)
