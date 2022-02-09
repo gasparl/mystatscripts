@@ -15,10 +15,9 @@ t_test = function(x, y) {
 # user-defined function to specify sample(s)
 
 # from rpact:
-design <- rpact::getDesignGroupSequential(typeOfDesign = "P", informationRates = c(0.33333333,
-                                                                            0.66666667, 1), alpha = 0.05, beta = 0.1, sided = 2, tolerance = 1e-08)
-summary(rpact::getSampleSizeMeans(design, meanRatio = FALSE, thetaH0 = 0, normalApproximation = FALSE,
-                           alternative = 0.5, stDev = 1, groups = 2, allocationRatioPlanned = 1))
+# design <- rpact::getDesignGroupSequential(typeOfDesign = "P", informationRates = c(0.33333333,  0.66666667, 1), alpha = 0.05, beta = 0.1, sided = 2, tolerance = 1e-08)
+# summary(rpact::getSampleSizeMeans(design, meanRatio = FALSE, thetaH0 = 0, normalApproximation = FALSE, alternative = 0.5, stDev = 1, groups = 2, allocationRatioPlanned = 1))
+
 # Number of subjects                   65.2  130.5  195.7
 # effect = 0.5, standard deviation = 1, power 90%.
 # Two-sided local significance level 0.0221 0.0221 0.0221
@@ -27,9 +26,9 @@ summary(rpact::getSampleSizeMeans(design, meanRatio = FALSE, thetaH0 = 0, normal
 
 custom_sample_v1 = function(v1, v2_h) {
   samples = list()
-  samples$v1 = rnorm(v1, mean = 0, sd = 1)
-  samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 1)
-  samples$v2_h1 = rnorm(v2_h, mean = 0.5, sd = 1)
+  samples$v1 = rnorm(v1, mean = 0, sd = 10)
+  samples$v2_h0 = rnorm(v2_h, mean = 0, sd = 10)
+  samples$v2_h1 = rnorm(v2_h, mean = 5, sd = 10)
   return(samples)
 }
 
@@ -43,20 +42,30 @@ custom_test_v1 = function(sampl) {
       p_h0 = t0$p.value,
       p_h1 = t1$p.value,
       cohens_d_0 = t0$smd,
-      m_diff_0 = mean(sampl$v2_h0) - mean(sampl$v1),
-      cohens_d_1 = t0$smd,
-      m_diff_1 = mean(sampl$v2_h1) - mean(sampl$v1)
+      m_diff_0 = t0$mean_diff,
+      cohens_d_1 = t1$smd,
+      m_diff_1 = t1$mean_diff
     )
   )
 }
 
-df_ps = sim_pvals(
-  f_sample = custom_test_v1,
-  n_obs = c(65, 131, 196),
+df_ps_v1 = sim_pvals(
+  f_sample = custom_sample_v1,
+  n_obs = c(33, 65, 98),
+  # c(65.2, 130.5, 195.7)/2
   f_test = custom_test_v1,
-  n_iter = 5000
+  n_iter = 10000
 )
+# pwr::pwr.t.test(d = 0.5, n = 98)
 
+# saveRDS(df_ps_v1, "df_ps_example_v1.rds")
+# df_ps_v1 = readRDS("df_ps_example_v1.rds")
+pow_results = get_pow(df_ps_v1, round_to = 5)
+
+#### end of example 1
+
+
+pow_results = get_pow(df_ps_v1, round_to = 5, fut_locals = list(p = c(0.9,0.9)))
 
 
 custom_sample2 = function(v1, v2_h, h1_mean, h1_sd) {
@@ -123,7 +132,9 @@ get_pow(df_ps, alpha_global = .1735)
 
 # to check effect size
 tx = t_test(
-  x = bayestestR::distribution_normal(1000, 0.5, sd = 1),
-  y = bayestestR::distribution_normal(1000, 0, sd = 1)
+  x = bayestestR::distribution_normal(10000, 5, sd = 10),
+  y = bayestestR::distribution_normal(10000, 0, sd = 10)
 )
+tx$smd
 
+neatStats::t_neat(bayestestR::distribution_normal(10000, 5, sd = 10),bayestestR::distribution_normal(10000, 0, sd = 10))
