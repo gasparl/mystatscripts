@@ -60,12 +60,19 @@ df_ps_v1 = sim_pvals(
 
 # saveRDS(df_ps_v1, "df_ps_example_v1.rds")
 # df_ps_v1 = readRDS("df_ps_example_v1.rds")
+# df_ps_v1 = readRDS("df_ps_example_v1_large.rds")
 pow_results = get_pow(df_ps_v1, round_to = 5)
+
+# saveRDS(pow_results, "pow_results_example_v1_fut.rds")
+# pow_results1 = readRDS("pow_results_example_v1.rds")
+# pow_results2 = readRDS("pow_results_example_v1_fut.rds")
 
 #### end of example 1
 
+pow_results = get_pow(df_ps_v1, round_to = 5, fut_locals = list(p = c(0.9, 0.9)))
 
-pow_results = get_pow(df_ps_v1, round_to = 5, fut_locals = list(p = c(0.9,0.9)))
+# sth wrong.. maybe reverse >/< signs or sth
+
 
 
 custom_sample2 = function(v1, v2_h, h1_mean, h1_sd) {
@@ -137,4 +144,59 @@ tx = t_test(
 )
 tx$smd
 
-neatStats::t_neat(bayestestR::distribution_normal(10000, 5, sd = 10),bayestestR::distribution_normal(10000, 0, sd = 10))
+# neatStats::t_neat(bayestestR::distribution_normal(10000, 5, sd = 10),bayestestR::distribution_normal(10000, 0, sd = 10))
+
+
+## BENCHMARKING
+library('microbenchmark')
+
+
+df_bm = readRDS("df_ps_example_v1.rds")
+DT_bm = data.table::copy(df_bm)
+data.table::setDT(DT_bm)
+data.table::setkey(DT_bm, look)
+# class(df_bm)
+# class(DT_bm)
+#
+# # example
+# microbenchmark(df = df_bm[df_bm$look == 1,],
+#                DT = DT_bm[look == 1],
+#                DT2 = DT_bm[look == 1,],
+#                check='equivalent', times = 100)
+###
+
+xx_names = c('h0_stoP', 'p_h0_sign')
+xx_names_l = c('h0_stoP', 'p_h0_sign')
+for (xnam in xx_names) {
+  df_bm[[xnam]] = sample(c(TRUE, FALSE), nrow(df_bm), TRUE)
+  DT_bm[[xnam]] = df_bm[[xnam]]
+}
+
+
+microbenchmark(
+  DT_1 =
+    {
+      newdf = data.table::copy(DT_bm)
+      newdf = newdf[look == mlook | h0_stoP == TRUE]
+      tmp <- newdf[, .(look = min(look)), by = iter]
+      data.table::setkey(tmp, iter, look)
+      data.table::setkey(newdf, iter, look)
+      type1 = mean(unlist(
+        newdf[tmp, mult = "first"][, ..xx_names]
+      ))
+    },
+  DT_2 =
+    {
+      newdf = data.table::copy(DT_bm)
+      pvals_df_stp = newdf[look == mlook | h0_stoP == TRUE]
+      type1 = mean(unlist(pvals_df_stp[, min_look := min(look), by = iter][look == min_look, ..xx_names]))
+    },
+  DT_3 =
+    {
+      newdf = data.table::copy(DT_bm)
+      pvals_df_stp = newdf[look == mlook | h0_stoP == TRUE, ..xx_names_l]
+      type1 = mean(unlist(pvals_df_stp[, min_look := min(look), by = iter][look == min_look, ..xx_names]))
+    },
+  check = 'equivalent',
+  times = 150
+)
