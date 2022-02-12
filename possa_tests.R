@@ -61,7 +61,8 @@ df_ps_v1 = sim_pvals(
 # saveRDS(df_ps_v1, "df_ps_example_v1.rds")
 # df_ps_v1 = readRDS("df_ps_example_v1.rds")
 # df_ps_v1 = readRDS("df_ps_example_v1_large.rds")
-pow_results = get_pow(df_ps_v1, round_to = 5)
+pow_results_1 = get_pow(df_ps_v1, round_to = 5)
+# Two-sided local significance level 0.0221 0.0221 0.0221
 
 # saveRDS(pow_results, "pow_results_example_v1_fut.rds")
 # pow_results1 = readRDS("pow_results_example_v1.rds")
@@ -69,9 +70,8 @@ pow_results = get_pow(df_ps_v1, round_to = 5)
 
 #### end of example 1
 
-pow_results = get_pow(df_ps_v1, round_to = 5, fut_locals = list(p = c(0.9, 0.9)))
+pow_results = get_pow(df_ps_v1, round_to = 5, fut_locals = list(p = c(0.5, 0.5)))
 
-# sth wrong.. maybe reverse >/< signs or sth
 
 
 

@@ -23,7 +23,7 @@ sim_pvals = function(f_sample,
     df_combs = sapply(expand.grid(f_s_args), as.vector)
     f_s_a_list = list()
     for (rownum in 1:nrow(df_combs)) {
-      f_s_a_list[[rownum]] = as.list(df_combs[rownum, ])
+      f_s_a_list[[rownum]] = as.list(df_combs[rownum,])
     }
   } else {
     # set to have no combinations; single sample test (hence 1 cycle below)
@@ -98,7 +98,7 @@ sim_pvals = function(f_sample,
   }
   close(pb)
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look), ]
+  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look),]
   for (c_nam in names(n_obs)) {
     class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
   }
@@ -113,6 +113,7 @@ sim_pvals = function(f_sample,
 # alpha_locals = NULL
 # alpha_global = 0.05
 # fut_locals = NULL
+# fut_locals = list(p = c(0.95, 0.95))
 # group_by = NULL
 # alpha_locals_extra = NULL
 # design_fix = NULL
@@ -131,6 +132,7 @@ get_pow = function(p_values,
                    alpha_locals = NULL,
                    alpha_global = 0.05,
                    fut_locals = NULL,
+                   adjust = NULL,
                    group_by = NULL,
                    alpha_locals_extra = NULL,
                    design_fix = NULL,
@@ -152,6 +154,16 @@ get_pow = function(p_values,
       immediate. = TRUE
     )
   }
+  if (is.null(adjust)) {
+    adjust = function(adj, prev) {
+      prev[is.na(prev)] = adj
+      return(prev)
+    }
+  } else (
+    if (!'adj' %in% formalArgs(adjust)) {
+      stop('The "adjust" function must contain an "adj" parameter.')
+    }
+  )
   if (is.function(multi_logic)) {
     if (isTRUE(all.equal(multi_logic, any))) {
       message(
@@ -223,16 +235,21 @@ get_pow = function(p_values,
       # if vector given
       if (is.numeric(alpha_locals)) {
         # if numeric, assign to each p column
-        if (!length(alpha_locals) == mlook) {
+        if (length(alpha_locals) == 1) {
+          for (pnam in p_names) {
+            a_locals[[pnam]] = rep(alpha_locals, mlook)
+          }
+        } else if (!length(alpha_locals) == mlook) {
           stop(
             'Wrong argument for "alpha_locals". (If a numeric vector is given, ',
             'it must have same length as the maximum number of looks (in this case ',
             mlook,
             ').)'
           )
-        }
-        for (pnam in p_names) {
-          a_locals[[pnam]] = alpha_locals
+        } else {
+          for (pnam in p_names) {
+            a_locals[[pnam]] = alpha_locals
+          }
         }
         loc_pnames = p_names
       } else {
@@ -272,7 +289,7 @@ get_pow = function(p_values,
   # if not given, add NA for all local alphas
   if (!length(a_locals) > 0) {
     for (pnam in p_names) {
-      a_locals[[pnam]] = rep(NA, mlook)
+      a_locals[[pnam]] = c(rep(1, (mlook - 1)), global_alpha)
     }
   } else {
     lapply(a_locals, function(vec) {
@@ -284,7 +301,7 @@ get_pow = function(p_values,
     })
   }
   p_extr = NULL
-  if (is.null(alpha_locals_extra)) {
+  if (!is.null(alpha_locals_extra)) {
     lapply(alpha_locals_extra, function(vec) {
       if (any(is.na(vec))) {
         stop('The alpha values given in alpha_locals_extra must ',
@@ -323,16 +340,21 @@ get_pow = function(p_values,
   if (!is.null(fut_locals)) {
     if (is.atomic(fut_locals)) {
       # if vector given, assign to each p column
-      if (!length(fut_locals) == (mlook - 1)) {
+      if (length(fut_locals) == 1) {
+        for (pnam in p_names) {
+          fa_locals[[pnam]] = rep(fut_locals, mlook)
+        }
+      } else if (!length(fut_locals) == (mlook - 1)) {
         stop(
           'Wrong argument for "fut_locals". (If a numeric vector is given, ',
           'its length must be one less than the maximum number of looks (in this case ',
           (mlook - 1),
           ').)'
         )
-      }
-      for (pnam in p_names) {
-        fa_locals[[pnam]] = fut_locals
+      } else {
+        for (pnam in p_names) {
+          fa_locals[[pnam]] = fut_locals
+        }
       }
     } else {
       # if list, assign per name
@@ -363,14 +385,9 @@ get_pow = function(p_values,
     }
   }
   # if not given, add 1 for all local futility bounds
-  # if given, add 1 for the last look (since it should not matter)
   if (!length(fa_locals) > 0) {
     for (pnam in p_names) {
-      fa_locals[[pnam]] = rep(1, mlook)
-    }
-  } else {
-    for (pnam in p_names) {
-      fa_locals[[pnam]] = c(fa_locals[[pnam]], 1)
+      fa_locals[[pnam]] = rep(1, (mlook - 1))
     }
   }
   if (is.null(group_by)) {
@@ -428,7 +445,7 @@ get_pow = function(p_values,
     for (lk in looks) {
       tot_samples = c(tot_samples, sum(pvals_df[.(lk), ..n_cols, mult = 'first']))
     }
-
+    look_ratios = tot_samples / tot_samples[mlook]
     ## Fixed design calculation below
     if (is.null(design_fix)) {
       fix_looks = mlook # (default) show at max look only
@@ -462,7 +479,9 @@ get_pow = function(p_values,
       locls_temp = a_locals
       a_adj = alpha_global / length(looks) # start with bonferroni
       stair_steps = staircase_steps
-      if (!is.null(alpha_locals_extra)) {
+      if (!any(is.na(unlist(a_locals)))) {
+        stair_steps = c(0, NA) # nothing to adjust
+      } else if (!is.null(alpha_locals_extra)) {
         stair_steps = c(stair_steps, NA)
       }
       a_step = stair_steps[1] # initial alpha-changing step
@@ -495,7 +514,8 @@ get_pow = function(p_values,
           p_names_temp = p_names_extr
         }
         for (p_nam in p_names_temp) {
-          locls_temp[[p_nam]][is.na(a_locals[[p_nam]])] = a_adj # adjust alpha where missing
+          # adjust alpha where missing
+          locls_temp[[p_nam]] = doCall(adjust, list(a = a_adj, prev = locls_temp[[p_nam]], rate = look_ratios))
           for (lk in 1:mlook) {
             # decide significance at given look for given p
             pvals_df[.(lk), c(paste0(p_nam, '_h0_sign')) :=
@@ -582,7 +602,7 @@ get_pow = function(p_values,
       for (p_nam in p_names_extr) {
         pvals_df[, c(paste0(p_nam, '_h1_sign')) := NA]
         if (!is.null(fut_locals)) {
-          pvals_df[, c(paste0(p_nam, '_h0_fut')) := TRUE]
+          pvals_df[, c(paste0(p_nam, '_h1_fut')) := TRUE]
         }
         for (lk in 1:mlook) {
           pvals_df[.(lk), c(paste0(p_nam, '_h1_sign')) :=
@@ -610,12 +630,12 @@ get_pow = function(p_values,
       if (!is.null(fut_locals)) {
         if (multi_p) {
           if (is.function(multi_logic_fut)) {
-            pvals_df[,  h1_stoP_fa := apply(.SD, 1, multi_logic_fut), .SDcols = p_h0_fut_names]
+            pvals_df[,  h1_stoP_fa := apply(.SD, 1, multi_logic_fut), .SDcols = p_h1_fut_names]
           } else {
-            pvals_df[, h1_stoP_fa := Reduce(multi_logic_fut, .SD), .SDcols = p_h0_fut_names]
+            pvals_df[, h1_stoP_fa := Reduce(multi_logic_fut, .SD), .SDcols = p_h1_fut_names]
           }
         } else {
-          pvals_df[, h1_stoP_fa := .SD, .SDcols = p_h0_fut_names]
+          pvals_df[, h1_stoP_fa := .SD, .SDcols = p_h1_fut_names]
         }
         pvals_df[, h1_stoP := h1_stoP | h1_stoP_fa]
       }
@@ -638,11 +658,11 @@ get_pow = function(p_values,
         iters_out0 = ps_sub0[look == lk &
                                h0_stoP == TRUE]
         # remove stopped iterations
-        ps_sub0 = ps_sub0[!iter %in% iters_out0$iter,]
+        ps_sub0 = ps_sub0[!iter %in% iters_out0$iter, ]
         # (same for H1)
         iters_out1 = ps_sub1[look == lk &
-                               h1_stoP == TRUE, ]
-        ps_sub1 = ps_sub1[!iter %in% iters_out1$iter, ]
+                               h1_stoP == TRUE,]
+        ps_sub1 = ps_sub1[!iter %in% iters_out1$iter,]
         outs = c()
         # get info per p value column
         for (p_nam in p_names_extr) {
@@ -687,7 +707,7 @@ get_pow = function(p_values,
         df_stops[paste0('alpha_local_', p_nam)] = a_locals_fin[[pnam]]
         if (!is.null(fut_locals)) {
           # write out local futility bounds (if any)
-          df_stops[paste0('futil_local_', p_nam)] = fa_locals[[pnam]]
+          df_stops[paste0('futil_local_', p_nam)] = c(fa_locals[[pnam]], NA)
         }
         for (h01 in c('_h0', '_h1')) {
           # ratio of significant findings at any given stop
@@ -726,8 +746,10 @@ get_pow = function(p_values,
       fut_text = ''
       for (p_nam in p_names_extr) {
         if (!is.null(fut_locals)) {
-          fut_text = paste(paste0('(', looks, ') ',
-                                  round(fa_locals[[pnam]][-mlook], round_to)), collapse = '; ')
+          fut_text = paste('\nFutility bounds:', paste(paste0(
+            '(', looks[-mlook], ') ',
+            round(fa_locals[[pnam]], round_to)
+          ), collapse = '; '))
         }
         cat(
           '(',
@@ -741,7 +763,6 @@ get_pow = function(p_values,
             '(', looks, ') ', round(a_locals_fin[[pnam]], round_to)
           ), collapse = '; '),
           fut_text,
-          '\n',
           sep = '',
           fill = TRUE
         )
