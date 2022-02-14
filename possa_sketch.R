@@ -1,7 +1,4 @@
 # A first sketch for Power Simulation for Sequential Analysis
-library('data.table')
-
-
 
 # simulation procedure to get p values
 sim_pvals = function(f_sample,
@@ -23,7 +20,7 @@ sim_pvals = function(f_sample,
     df_combs = sapply(expand.grid(f_s_args), as.vector)
     f_s_a_list = list()
     for (rownum in 1:nrow(df_combs)) {
-      f_s_a_list[[rownum]] = as.list(df_combs[rownum,])
+      f_s_a_list[[rownum]] = as.list(df_combs[rownum, ])
     }
   } else {
     # set to have no combinations; single sample test (hence 1 cycle below)
@@ -98,7 +95,7 @@ sim_pvals = function(f_sample,
   }
   close(pb)
   df_pvals = as.data.frame(do.call(rbind, list_vals))
-  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look),]
+  df_pvals = df_pvals[order(df_pvals$iter, df_pvals$look), ]
   for (c_nam in names(n_obs)) {
     class(df_pvals[[c_nam]]) = c(class(df_pvals[[c_nam]]), "possa_n")
   }
@@ -109,7 +106,7 @@ sim_pvals = function(f_sample,
   return(df_pvals)
 }
 
-# p_values = df_bm
+# p_values = df_ps_v1
 # alpha_locals = NULL
 # alpha_global = 0.05
 # fut_locals = NULL
@@ -126,6 +123,8 @@ sim_pvals = function(f_sample,
 # staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1)))
 # alpha_precision = 5
 # seed = 8
+# adj_init = NULL
+# adjust = NULL
 
 # power calculation
 get_pow = function(p_values,
@@ -133,6 +132,7 @@ get_pow = function(p_values,
                    alpha_global = 0.05,
                    fut_locals = NULL,
                    adjust = NULL,
+                   adj_init = NULL,
                    group_by = NULL,
                    alpha_locals_extra = NULL,
                    design_fix = NULL,
@@ -142,9 +142,7 @@ get_pow = function(p_values,
                    round_to = 3,
                    multi_logic = 'all',
                    multi_logic_fut = 'all',
-                   staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1))),
-                   # default: 11 steps from 0.01, decreasing by halves
-                   # check: formatC(staircase_steps, digits = 12, format = "f")
+                   staircase_steps = NULL,
                    alpha_precision = 5,
                    seed = 8) {
   set.seed(seed)
@@ -154,16 +152,6 @@ get_pow = function(p_values,
       immediate. = TRUE
     )
   }
-  if (is.null(adjust)) {
-    adjust = function(adj, prev) {
-      prev[is.na(prev)] = adj
-      return(prev)
-    }
-  } else (
-    if (!'adj' %in% formalArgs(adjust)) {
-      stop('The "adjust" function must contain an "adj" parameter.')
-    }
-  )
   if (is.function(multi_logic)) {
     if (isTRUE(all.equal(multi_logic, any))) {
       message(
@@ -205,9 +193,6 @@ get_pow = function(p_values,
   data.table::setDT(p_values)
   data.table::setkey(p_values, look)
   data.table::setindex(p_values, iter)
-  if (any(is.na(staircase_steps))) {
-    stop('The staircase_steps vector must not contain NA values.')
-  }
   looks = unique(p_values$look)
   mlook = max(p_values$look)
   # get columns with sample sizes (n), factors (fac), and p values (p_/_h0/1)
@@ -233,7 +218,10 @@ get_pow = function(p_values,
   if (!is.null(alpha_locals)) {
     if (is.atomic(alpha_locals)) {
       # if vector given
-      if (is.numeric(alpha_locals)) {
+      if (is.character(alpha_locals)) {
+        # if character, simply give the names
+        loc_pnames = alpha_locals
+      } else {
         # if numeric, assign to each p column
         if (length(alpha_locals) == 1) {
           for (pnam in p_names) {
@@ -252,9 +240,6 @@ get_pow = function(p_values,
           }
         }
         loc_pnames = p_names
-      } else {
-        # if character, simply give the names
-        loc_pnames = alpha_locals
       }
     } else {
       # if list, use as it is, and assign per name
@@ -286,10 +271,11 @@ get_pow = function(p_values,
     }
     p_names = loc_pnames
   }
-  # if not given, add NA for all local alphas
   if (!length(a_locals) > 0) {
+    # if not given, check only last look (with alpha_global)
+    # for the rest, local alpha will be 0
     for (pnam in p_names) {
-      a_locals[[pnam]] = c(rep(1, (mlook - 1)), global_alpha)
+      a_locals[[pnam]] = c(rep(0, (mlook - 1)), alpha_global)
     }
   } else {
     lapply(a_locals, function(vec) {
@@ -390,6 +376,68 @@ get_pow = function(p_values,
       fa_locals[[pnam]] = rep(1, (mlook - 1))
     }
   }
+
+
+  if (is.null(staircase_steps)) {
+    if (anyNA(unlist(a_locals))) {
+      # default for NA replacement: 11 steps from 0.01, decreasing by halves
+      # check: formatC(staircase_steps, digits = 12, format = "f")
+      staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1)))
+    } else {
+      staircase_steps = NA
+    }
+  } else if (any(is.na(staircase_steps))) {
+    stop('The staircase_steps vector must not contain NA values.')
+  }
+
+  if (is.null(adj_init)) {
+    # if not given, start adjustment with bonferroni correction
+    # (assuming it's going to be used as an alpha level, replacing NAs)
+    adj_init = alpha_global / mlook
+  }
+  if (is.null(adjust)) {
+    adjust = function(adj, prev, orig) {
+      prev[is.na(orig)] = adj
+      return(prev)
+    }
+  } else {
+    if (!'adj' %in% formalArgs(adjust)) {
+      stop('The "adjust" function must contain an "adj" parameter.')
+    }
+    for (a_arg in c('prev', 'orig')) {
+      if (!a_arg %in%  formalArgs(adjust)) {
+        formals(adjust)[[a_arg]] = NA
+      }
+    }
+    a_example = a_locals[p_names[1]]
+    adjusted_check = adjust(adj = adj_init, prev = a_example)
+    if (length(adjusted_check) != mlook) {
+      stop(
+        'The "adjust" function must return a vector with the same length ',
+        ' as the maximum number of looks (in this case ',
+        mlook,
+        ').'
+      )
+    }
+    if (anyNA(adjusted_check)) {
+      warning(
+        'The local alphas returned by the given "adjust" contain NA(s). ',
+        'This should normally not happen, and may cause errors.'
+      )
+    }
+    if (sum(adjusted_check, na.rm = TRUE) < sum(adjust(adj = adj_init + 0.01,
+                                                       prev = a_example), na.rm = TRUE) |
+        sum(adjusted_check, na.rm = TRUE) > sum(adjust(adj = adj_init - 0.01,
+                                                       prev = a_example), na.rm = TRUE)) {
+      warning(
+        'The local alphas returned by the  "adjust" function should normally ',
+        'increase when the "adj" argument increases, and decrease when the latter ',
+        'decreases. The behavior of the given function seems different.'
+      )
+    }
+  }
+
+
   if (is.null(group_by)) {
     group_by = fac_cols
   } else if (!identical(sort(group_by), sort(fac_cols))) {
@@ -477,15 +525,13 @@ get_pow = function(p_values,
     if (design_seq == TRUE & mlook > 1) {
       # "trial and error" straircase procedure below, to get the desired adjusted alpha
       locls_temp = a_locals
-      a_adj = alpha_global / length(looks) # start with bonferroni
+      a_adj = adj_init
       stair_steps = staircase_steps
-      if (!any(is.na(unlist(a_locals)))) {
-        stair_steps = c(0, NA) # nothing to adjust
-      } else if (!is.null(alpha_locals_extra)) {
+      if (!is.null(alpha_locals_extra) &
+          !is.na(stair_steps[length(stair_steps)])) {
         stair_steps = c(stair_steps, NA)
       }
-      a_step = stair_steps[1] # initial alpha-changing step
-      stair_steps = stair_steps[-1]
+      a_step = stair_steps[1] # initial a_adj-changing step
       p_h0_sign_names = paste0(p_names, '_h0_sign')
       multi_p = length(p_h0_sign_names) > 1
       p_h0_sign_names_plus = c(p_h0_sign_names, 'look', 'iter')
@@ -507,15 +553,38 @@ get_pow = function(p_values,
           pvals_df[, c(paste0(p_nam, '_h0_fut')) := TRUE] # create fut column for given p
         }
       }
+      safe_count = 0
+      type1 = 1
       while (length(stair_steps) > 0) {
         # calculate H0 significances (T/F) & stops (T/F) based on adjusted alphas
         if (is.na(stair_steps[1])) {
           # as a last step, add non-stopping columns, if any
           p_names_temp = p_names_extr
         }
+        safe_count = safe_count + 1
+        if (safe_count %% 100 == 0) {
+          cat(
+            paste0(
+              'There have been ',
+              safe_count,
+              ' iterations. The arguments given may be problematic.',
+              '\nNote: The current global type 1 error is ',
+              as.numeric(round(type1, 4)),
+              ' (expected: ',
+              round(alpha_global, 4),
+              ').'
+            ),
+            fill = TRUE
+          )
+          if (readline('Do you want to quit this function? (y/n) \n') == 'y') {
+            return(cat("Exited safely."))
+          }
+        }
         for (p_nam in p_names_temp) {
-          # adjust alpha where missing
-          locls_temp[[p_nam]] = doCall(adjust, list(a = a_adj, prev = locls_temp[[p_nam]], rate = look_ratios))
+          # adjust alpha
+          locls_temp[[p_nam]] = adjust(adj = a_adj,
+                                       prev = locls_temp[[p_nam]],
+                                       orig = a_locals[[p_nam]])
           for (lk in 1:mlook) {
             # decide significance at given look for given p
             pvals_df[.(lk), c(paste0(p_nam, '_h0_sign')) :=
@@ -532,45 +601,49 @@ get_pow = function(p_values,
         # now check the global type 1 error
 
         # first check at which look we stop
-        if (!is.na(stair_steps[1])) {
-          # if multiple p values are given as stoppers
-          # use multi_logic to check where to stop
-          # otherwise it simply stops where the given p is sign
+        # if multiple p values are given as stoppers
+        # use multi_logic to check where to stop
+        # otherwise it simply stops where the given p is sign
+        if (multi_p) {
+          if (is.function(multi_logic)) {
+            pvals_df[,  h0_stoP := apply(.SD, 1, multi_logic), .SDcols = p_h0_sign_names]
+          } else {
+            pvals_df[, h0_stoP := Reduce(multi_logic, .SD), .SDcols = p_h0_sign_names]
+          }
+        } else {
+          pvals_df[, h0_stoP := .SD, .SDcols = p_h0_sign_names]
+        }
+        if (!is.null(fut_locals)) {
+          # analogue with futility bounds
           if (multi_p) {
-            if (is.function(multi_logic)) {
-              pvals_df[,  h0_stoP := apply(.SD, 1, multi_logic), .SDcols = p_h0_sign_names]
+            if (is.function(multi_logic_fut)) {
+              pvals_df[,  h0_stoP_fa := apply(.SD, 1, multi_logic_fut), .SDcols = p_h0_fut_names]
             } else {
-              pvals_df[, h0_stoP := Reduce(multi_logic, .SD), .SDcols = p_h0_sign_names]
+              pvals_df[, h0_stoP_fa := Reduce(multi_logic_fut, .SD), .SDcols = p_h0_fut_names]
             }
           } else {
-            pvals_df[, h0_stoP := .SD, .SDcols = p_h0_sign_names]
+            pvals_df[, h0_stoP_fa := .SD, .SDcols = p_h0_fut_names]
           }
-          if (!is.null(fut_locals)) {
-            # analogue with futility bounds
-            if (multi_p) {
-              if (is.function(multi_logic_fut)) {
-                pvals_df[,  h0_stoP_fa := apply(.SD, 1, multi_logic_fut), .SDcols = p_h0_fut_names]
-              } else {
-                pvals_df[, h0_stoP_fa := Reduce(multi_logic_fut, .SD), .SDcols = p_h0_fut_names]
-              }
-            } else {
-              pvals_df[, h0_stoP_fa := .SD, .SDcols = p_h0_fut_names]
-            }
-            pvals_df[, h0_stoP := h0_stoP | h0_stoP_fa]
-          }
+          pvals_df[, h0_stoP := h0_stoP | h0_stoP_fa]
+        }
 
-          # now get all outcomes at stopping point
-          pvals_stp = pvals_df[look == mlook |
-                                 h0_stoP == TRUE,  ..p_h0_sign_names_plus]
-          type1 = mean(unlist(pvals_stp[, min_look := min(look), by = iter][look == min_look, ..p_h0_sign_names]))
+        # now get all outcomes at stopping point
+        pvals_stp = pvals_df[look == mlook |
+                               h0_stoP == TRUE,  ..p_h0_sign_names_plus]
+        type1 = mean(unlist(pvals_stp[, min_look := min(look), by = iter][look == min_look, ..p_h0_sign_names]))
 
+        if (is.na(stair_steps[1])) {
+          # NA indicates no stairs; nothing left to be done
+          break
+        } else{
           # break if global alpha is correct
           # otherwise continue the staircase
           if (round(type1, alpha_precision) == round(alpha_global, alpha_precision)) {
             if (is.null(alpha_locals_extra)) {
               break
             } else {
-              stair_steps = 0
+              stair_steps = NA
+              a_step = 0
             }
           } else if ((type1 < alpha_global &&
                       a_step < 0) ||
@@ -580,6 +653,8 @@ get_pow = function(p_values,
             stair_steps = stair_steps[-1]
             setTxtProgressBar(pb, getTxtProgressBar(pb) + 1)
           }
+          # adjust a_adj itself by the step
+          # this a_adj will be used in the adjust function
           a_adj = a_adj + a_step
 
           ### TO REMOVE (just for testing)
@@ -658,11 +733,11 @@ get_pow = function(p_values,
         iters_out0 = ps_sub0[look == lk &
                                h0_stoP == TRUE]
         # remove stopped iterations
-        ps_sub0 = ps_sub0[!iter %in% iters_out0$iter, ]
+        ps_sub0 = ps_sub0[!iter %in% iters_out0$iter,]
         # (same for H1)
         iters_out1 = ps_sub1[look == lk &
-                               h1_stoP == TRUE,]
-        ps_sub1 = ps_sub1[!iter %in% iters_out1$iter,]
+                               h1_stoP == TRUE, ]
+        ps_sub1 = ps_sub1[!iter %in% iters_out1$iter, ]
         outs = c()
         # get info per p value column
         for (p_nam in p_names_extr) {
