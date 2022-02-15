@@ -1,7 +1,7 @@
 # A first sketch for Power Simulation for Sequential Analysis
 
 # simulation procedure to get p values
-sim_pvals = function(f_sample,
+sim = function(f_sample,
                      n_obs,
                      f_test,
                      n_iter = 1000,
@@ -110,7 +110,8 @@ sim_pvals = function(f_sample,
 # alpha_locals = NULL
 # alpha_global = 0.05
 # fut_locals = NULL
-# fut_locals = list(p = c(0.95, 0.95))
+# adjust = NULL
+# adj_init = NULL
 # group_by = NULL
 # alpha_locals_extra = NULL
 # design_fix = NULL
@@ -120,14 +121,12 @@ sim_pvals = function(f_sample,
 # round_to = 3
 # multi_logic = 'all'
 # multi_logic_fut = 'all'
-# staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1)))
+# staircase_steps = NULL
 # alpha_precision = 5
 # seed = 8
-# adj_init = NULL
-# adjust = NULL
 
 # power calculation
-get_pow = function(p_values,
+pow = function(p_values,
                    alpha_locals = NULL,
                    alpha_global = 0.05,
                    fut_locals = NULL,
@@ -383,6 +382,16 @@ get_pow = function(p_values,
       # default for NA replacement: 11 steps from 0.01, decreasing by halves
       # check: formatC(staircase_steps, digits = 12, format = "f")
       staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1)))
+    } else if (!is.null(adjust)) {
+      staircase_steps = 0.01 * (0.5 ** (seq(0, 11, 1)))
+      if (any(grepl('*', deparse(body(adjust)), fixed = TRUE))) {
+        print("FOUND MULTI!!!!")
+        if (is.null(adj_init)) {
+          adj_init = 1 # assumes multiplication
+        }
+        # slightly larger steps, again assuming multiplications
+        staircase_steps = 0.5 * (0.5 ** (seq(0, 11, 1)))
+      }
     } else {
       staircase_steps = NA
     }
@@ -410,7 +419,9 @@ get_pow = function(p_values,
       }
     }
     a_example = a_locals[p_names[1]]
-    adjusted_check = adjust(adj = adj_init, prev = a_example)
+    adjusted_check = adjust(adj = adj_init,
+                            prev = a_example,
+                            orig = a_example)
     if (length(adjusted_check) != mlook) {
       stop(
         'The "adjust" function must return a vector with the same length ',
@@ -425,10 +436,18 @@ get_pow = function(p_values,
         'This should normally not happen, and may cause errors.'
       )
     }
-    if (sum(adjusted_check, na.rm = TRUE) < sum(adjust(adj = adj_init + 0.01,
-                                                       prev = a_example), na.rm = TRUE) |
-        sum(adjusted_check, na.rm = TRUE) > sum(adjust(adj = adj_init - 0.01,
-                                                       prev = a_example), na.rm = TRUE)) {
+    if (sum(adjusted_check, na.rm = TRUE) > sum(adjust(
+      adj = adj_init + 0.1,
+      prev = a_example,
+      orig = a_example
+    ),
+    na.rm = TRUE) |
+    sum(adjusted_check, na.rm = TRUE) < sum(adjust(
+      adj = adj_init - 0.1,
+      prev = a_example,
+      orig = a_example
+    ),
+    na.rm = TRUE)) {
       warning(
         'The local alphas returned by the  "adjust" function should normally ',
         'increase when the "adj" argument increases, and decrease when the latter ',
@@ -556,6 +575,14 @@ get_pow = function(p_values,
       safe_count = 0
       type1 = 1
       while (length(stair_steps) > 0) {
+        ### TO REMOVE (just for testing)
+        cat('\ntype1',
+            type1,
+            'a_adj:',
+            a_adj,
+            'new step:',
+            a_step,
+            fill = T)
         # calculate H0 significances (T/F) & stops (T/F) based on adjusted alphas
         if (is.na(stair_steps[1])) {
           # as a last step, add non-stopping columns, if any
@@ -656,15 +683,6 @@ get_pow = function(p_values,
           # adjust a_adj itself by the step
           # this a_adj will be used in the adjust function
           a_adj = a_adj + a_step
-
-          ### TO REMOVE (just for testing)
-          cat('\ntype1',
-              type1,
-              'a_adj:',
-              a_adj,
-              'new step:',
-              a_step,
-              fill = T)
         }
       }
       setTxtProgressBar(pb, length(staircase_steps))
