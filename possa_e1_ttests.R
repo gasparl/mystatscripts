@@ -23,7 +23,7 @@ customTest_v1 = function(sample1, sample2_h0, sample2_h1) {
 
 df_ps_v1 = sim(fun_obs = customSample_v1,
                n_obs = c(27, 54, 81),
-               fun_test = customTest_v1)
+               fun_test = customTest_v1) # n_iter = 40000
 
 pow_results_1 = pow(df_ps_v1, alpha_locals = NA)
 pow(df_ps_v1, alpha_locals = NA, design_fix = TRUE)
@@ -39,6 +39,18 @@ pow(df_ps_v1, alpha_locals = NA, design_fix = TRUE)
 
 # pwr::pwr.t.test(d = 0.5, n = 81, alternative = 'greater')
 # "power = 0.9361993"
+
+pow(df_ps_v1)
+pow(df_ps_v1, alpha_locals = c(NA, NA, 0.05), fut_locals = 0.5)
+pow(df_ps_v1, fut_locals = 0.5)
+pow(df_ps_v1, fut_locals = c(1, 0.5))
+pow(df_ps_v1, fut_locals = c(0.5, 0.5))
+pow(df_ps_v1, fut_locals = c(0.8, 0.5))
+pow(df_ps_v1, fut_locals = c(0.2, 0.5))
+pow(df_ps_v1, fut_locals = c(0.5, 0.2))
+pow(df_ps_v1, alpha_locals = c(0, 0.05, 0.025), fut_locals = c(0.8, 0.5))
+pow(df_ps_v1, alpha_locals = c(0, 0.025, 0.05), fut_locals = c(0.8, 0.5))
+pow(df_ps_v1, alpha_locals = c(0.025, 0, 0.05), fut_locals = c(0.8, 0.5))
 
 
 df_ps_v1b = sim(fun_obs = customSample_v1,
@@ -60,8 +72,6 @@ pow(df_ps_v1c, alpha_locals = c(0.0013, 0.0013, NA), alpha_global = 0.01)
 # c(71.9, 143.8, 215.8) / 2
 # One-sided local significance level       0.0013 0.0013 0.0087
 
-
-
 # OF-correction
 
 df_ps_v1d = sim(fun_obs = customSample_v1,
@@ -69,6 +79,42 @@ df_ps_v1d = sim(fun_obs = customSample_v1,
                fun_test = customTest_v1)
 pow_results_1d_x = pow(df_ps_v1d, alpha_locals = c(0.0001, 0.0004, 0.0031, NA), alpha_global = 0.01)
 pow_results_1d_y = pow(df_ps_v1d, alpha_locals = c(0.0001, 0.0004, 0.0031, 0.0089), alpha_global = 0.01)
+
+pow(
+  df_ps_v1d,
+  alpha_locals = c(0.0001, 0.0004, 0.0031, 0.0089),
+  alpha_global = 0.01,
+  adjust = function(adj, prev, orig) {
+    return(orig + adj)
+  }
+)
+pow(
+  df_ps_v1d,
+  alpha_locals = c(0.0001, 0.0004, 0.0031, 0.0089),
+  alpha_global = 0.01,
+  adjust = FALSE
+)
+pow(
+  df_ps_v1d,
+  alpha_locals = c(0.01, 0.01, 0.01, 0.01),
+  alpha_global = 0.01,
+  adjust = FALSE
+)
+pow(
+  df_ps_v1d,
+  alpha_locals = c(0.01, 0.01, 0.01, 0.01),
+  adjust = FALSE
+)
+pow(
+  df_ps_v1d,
+  alpha_locals = 0.01,
+  adjust = FALSE
+)
+pow(
+  df_ps_v1d,
+  alpha_locals = NA,
+  alpha_global = 0.01
+)
 
 # summary(rpact::getSampleSizeMeans(rpact::getDesignGroupSequential(typeOfDesign = "OF", informationRates = c(0.25, 0.5, 0.75, 1), alpha = 0.01), alternative = 0.5))
 # Number of subjects                          41.5    82.9   124.4   165.8
@@ -127,25 +173,47 @@ customTest_v2 = function(v1, v2_h0, v2_h1) {
   )
 }
 
-df_ps_v2 = sim(fun_obs = customSample_v2,
-               n_obs = c(33, 66, 99),
-               fun_test = customTest_v2)
+df_ps_v2 = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(33, 66, 99),
+  fun_test = customTest_v2,
+  pair = TRUE
+)
 df_ps_v2_alt = sim(
   fun_obs = customSample_v2_alt,
   n_obs = list(v1 = c(33, 66, 99), v2_h = c(33, 66, 99)),
-  fun_test = customTest_v2
+  fun_test = customTest_v2,
+  pair = TRUE
 )
-df_ps_v2b = sim(fun_obs = customSample_v2,
-                n_obs = c(33, 44, 55, 66, 77, 88, 99),
-                fun_test = customTest_v2)
-df_ps_v2c = sim(fun_obs = customSample_v2,
-                n_obs = c(11, 22, 99),
-                fun_test = customTest_v2)
-df_ps_v2d = sim(fun_obs = customSample_v2,
-                n_obs = c(80, 90, 99),
-                fun_test = customTest_v2)
+df_ps_v2b = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(33, 44, 55, 66, 77, 88, 99),
+  fun_test = customTest_v2,
+  pair = TRUE
+)
+df_ps_v2c = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(11, 22, 99),
+  fun_test = customTest_v2,
+  pair = TRUE
+)
+df_ps_v2d = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(80, 90, 99),
+  fun_test = customTest_v2,
+  pair = TRUE
+)
 
 pow(df_ps_v2, alpha_locals = NA) # 3 looks
+pow(df_ps_v2, fut_locals = 0.5, alpha_locals = NA)
+pow(df_ps_v2)
+pow(df_ps_v2, fut_locals = 0.5)
+pow(df_ps_v2, fut_locals = c(0.5, 0.5))
+pow(df_ps_v2, fut_locals = c(0.5, 0.2))
+pow(df_ps_v2, fut_locals = c(0.7, 0.2))
+pow(df_ps_v2, fut_locals = c(0.2, 0.7))
+pow(df_ps_v2, fut_locals = c(1, 0.5))
+
 pow(df_ps_v2_alt, alpha_locals = NA) # alternative syntax
 pow(df_ps_v2b, alpha_locals = NA) # 7 looks
 pow(df_ps_v2c, alpha_locals = NA) # early looks

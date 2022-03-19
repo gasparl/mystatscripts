@@ -56,17 +56,19 @@ df_ps_facts = sim(
     my_samp,
     h1_mean = c(1.5, 2.5, 3.5),
     h1_corr = c(0, 0.5)
+    #h1_corr = c(0.5)
   ),
   n_obs = c(30, 60, 90),
-  fun_test = my_test
+  fun_test = my_test,
+  pair = TRUE
 )
 
 # saveRDS(df_ps_facts, neatStats::path_neat("df_ps_saved.rds"))
 # df_ps_facts = readRDS(neatStats::path_neat("df_ps_saved.rds"))
 
+neatStats::peek_neat(df_ps_facts, c("corr_0", "corr_1"), group_by = c('h1_corr', '.look'))
 neatStats::peek_neat(df_ps_facts, c("m_diff_0", "m_diff_1"), group_by = c('h1_mean'))
 neatStats::peek_neat(df_ps_facts, c("m_diff_1"), group_by = c('h1_mean', '.look'))
-neatStats::peek_neat(df_ps_facts, c("corr_0", "corr_1"), group_by = c('h1_corr', '.look'))
 # neatStats::peek_neat(df_ps_facts, c("smd_0"), group_by = c('h1_mean', 'h1_corr'))
 neatStats::peek_neat(df_ps_facts, c("smd_1"), group_by = c('h1_mean', 'h1_corr'))
 
@@ -83,7 +85,7 @@ pow(df_ps_facts, alpha_global = .001)
 
 pow(df_ps_facts, alpha_locals = NA)
 
-xx = pow(df_ps_facts, alpha_locals = NA, fut_locals = c(0.5,0.5))
-xx$df_3.5_0.5
+pow_results_facts = pow(df_ps_facts, alpha_locals = NA, fut_locals = c(0.5, 0.5))
+pow_results_facts$df_3.5_0.5
 
 
