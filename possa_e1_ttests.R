@@ -150,58 +150,65 @@ pow(df_ps_v1f, alpha_locals = c(0.0001, 0.0272, 0.0427), alpha_global = 0.05)
 
 # user-defined function to specify sample(s)
 customSample_v2 = function(samp_size) {
-  correlated_samples = faux::rnorm_multi(n = samp_size, vars = 3, mu = c(0, 0, 5), sd = 10, r = c(.3, .3, 0))
+  correlated_samples = faux::rnorm_multi(n = samp_size, vars = 3, mu = c(0, 0, 5), sd = 10, r = c(.5, .5, 0))
   list(
-    v1 = correlated_samples$X1, # correlated with both X2 and X3
-    v2_h0 = correlated_samples$X2, # correlated only with X1
-    v2_h1 = correlated_samples$X3  # correlated only with X1
+    GRP_v1 = correlated_samples$X1, # correlated with both X2 and X3
+    GRP_v2_h0 = correlated_samples$X2, # correlated only with X1
+    GRP_v2_h1 = correlated_samples$X3  # correlated only with X1
   )
 }
-customSample_v2_alt = function(v1, v2_h) {
-  correlated_samples = faux::rnorm_multi(n = v1, vars = 3, mu = c(0, 0, 5), sd = 10, r = c(.3, .3, 0))
+customSample_v2_alt = function(GRP_v1, GRP_v2_h) {
+  correlated_samples = faux::rnorm_multi(n = GRP_v1, vars = 3, mu = c(0, 0, 5), sd = 10, r = c(.5, .5, 0))
   list(
-    v1 = correlated_samples$X1, # correlated with both X2 and X3
-    v2_h0 = correlated_samples$X2, # correlated only with X1
-    v2_h1 = correlated_samples$X3  # correlated only with X1
+    GRP_v1 = correlated_samples$X1, # correlated with both X2 and X3
+    GRP_v2_h0 = correlated_samples$X2, # correlated only with X1
+    GRP_v2_h1 = correlated_samples$X3  # correlated only with X1
   )
 }
 # user-defined function to specify significance test(s)
-customTest_v2 = function(v1, v2_h0, v2_h1) {
+customTest_v2 = function(GRP_v1, GRP_v2_h0, GRP_v2_h1) {
   c(
-    p_h0 = t.test(v1, v2_h0, 'less', paired = TRUE, var.equal = TRUE)$p.value,
-    p_h1 = t.test(v1, v2_h1, 'less', paired = TRUE, var.equal = TRUE)$p.value
+    p_h0 = t.test(GRP_v1, GRP_v2_h0, 'less', paired = TRUE, var.equal = TRUE)$p.value,
+    p_h1 = t.test(GRP_v1, GRP_v2_h1, 'less', paired = TRUE, var.equal = TRUE)$p.value
   )
 }
 
 df_ps_v2 = sim(
   fun_obs = customSample_v2,
   n_obs = c(33, 66, 99),
+  fun_test = customTest_v2 #, n_iter = 45000
+)
+df_ps_v2_paired = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(33, 66, 99),
   fun_test = customTest_v2,
   pair = TRUE
 )
+df_ps_v2_unpaired = sim(
+  fun_obs = customSample_v2,
+  n_obs = c(33, 66, 99),
+  fun_test = customTest_v2,
+  pair = FALSE
+)
 df_ps_v2_alt = sim(
   fun_obs = customSample_v2_alt,
-  n_obs = list(v1 = c(33, 66, 99), v2_h = c(33, 66, 99)),
-  fun_test = customTest_v2,
-  pair = TRUE
+  n_obs = list(GRP_v1 = c(33, 66, 99), GRP_v2_h = c(33, 66, 99)),
+  fun_test = customTest_v2
 )
 df_ps_v2b = sim(
   fun_obs = customSample_v2,
   n_obs = c(33, 44, 55, 66, 77, 88, 99),
-  fun_test = customTest_v2,
-  pair = TRUE
+  fun_test = customTest_v2
 )
 df_ps_v2c = sim(
   fun_obs = customSample_v2,
   n_obs = c(11, 22, 99),
-  fun_test = customTest_v2,
-  pair = TRUE
+  fun_test = customTest_v2
 )
 df_ps_v2d = sim(
   fun_obs = customSample_v2,
   n_obs = c(80, 90, 99),
-  fun_test = customTest_v2,
-  pair = TRUE
+  fun_test = customTest_v2
 )
 
 pow(df_ps_v2, alpha_locals = NA) # 3 looks
@@ -215,6 +222,11 @@ pow(df_ps_v2, fut_locals = c(0.2, 0.7))
 pow(df_ps_v2, fut_locals = c(1, 0.5))
 
 pow(df_ps_v2_alt, alpha_locals = NA) # alternative syntax
+pow(df_ps_v2_paired, alpha_locals = NA) # paired explicitly
+pow(df_ps_v2_paired, fut_locals = 0.5) # paired explicitly
+pow(df_ps_v2_unpaired, alpha_locals = NA) # unpaired explicitly
+pow(df_ps_v2_unpaired, fut_locals = 0.5) # unpaired explicitly
+
 pow(df_ps_v2b, alpha_locals = NA) # 7 looks
 pow(df_ps_v2c, alpha_locals = NA) # early looks
 pow(df_ps_v2d, alpha_locals = NA) # late looks

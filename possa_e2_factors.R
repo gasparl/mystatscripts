@@ -1,3 +1,5 @@
+library('POSSA')
+
 # custom t-test function ####
 ttest = function(x, y) {
   t_info = stats::t.test(x, y, paired = TRUE, var.equal = T)
@@ -13,10 +15,6 @@ ttest = function(x, y) {
   ))
 }
 
-smd_paired = function(x, y) {
-  return((mean(x) - mean(y)) / sd_p)
-}
-
 my_samp = function(samp_size, h1_mean, h1_corr) {
   correlated_samples = faux::rnorm_multi(
     n = samp_size,
@@ -26,15 +24,15 @@ my_samp = function(samp_size, h1_mean, h1_corr) {
     r = c(h1_corr, h1_corr, 0)
   )
   list(
-    v1 = correlated_samples$X1, # correlated with both X2 and X3
-    v2_h0 = correlated_samples$X2, # correlated only with X1
-    v2_h1 = correlated_samples$X3  # correlated only with X1
+    GRP_v1 = correlated_samples$X1, # correlated with both X2 and X3
+    GRP_v2_h0 = correlated_samples$X2, # correlated only with X1
+    GRP_v2_h1 = correlated_samples$X3  # correlated only with X1
   )
 }
 
-my_test = function(v1, v2_h0, v2_h1) {
-  t0 = ttest(v2_h0, v1)
-  t1 = ttest(v2_h1, v1)
+my_test = function(GRP_v1, GRP_v2_h0, GRP_v2_h1) {
+  t0 = ttest(GRP_v2_h0, GRP_v1)
+  t1 = ttest(GRP_v2_h1, GRP_v1)
   return(c(
     p_h0 = t0$pval,
     m_diff_0 = t0$mean_diff,
@@ -60,7 +58,7 @@ df_ps_facts = sim(
   ),
   n_obs = c(30, 60, 90),
   fun_test = my_test,
-  pair = TRUE
+  pair = TRUE, n_iter = 100
 )
 
 # saveRDS(df_ps_facts, neatStats::path_neat("df_ps_saved.rds"))
