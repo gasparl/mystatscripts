@@ -4,37 +4,12 @@ mean_ci = function(sd, n) {
     return((((z ^ 2 * sd ^ 2) / n) ** 0.5) * 2)
 }
 
-z_pow = function (r1, r2, n) {
-    z1 = 0.5 * log((1 + r1) / (1 - r1))
-    z2 = 0.5 * log((1 + r2) / (1 - r2))
-    sigma = (1 / (n - 3) + 1 / (n - 3)) ** 0.5
-    z = qnorm(1 - (1 - .95) / 2)
-    beta = (z1 - z2) / sigma - z
-    return(pnorm(beta))
-}
-z_pow(.84,.63855, 100)
-
-z_r2(.84, 100)
-
-z_r2 = function (r1, n) {
-    z1 = 0.5 * log((1 + r1) / (1 - r1))
-    sigma = (1 / (n - 3) + 1 / (n - 3)) ** 0.5
-    z = qnorm(1 - (1 - .95) / 2)
-    z_beta = pnorm(qnorm(1 - .2/2)) # power of .9
-    z2 = z1 - sigma * (z_beta + z)
-    r2 = (exp(z2 * 2) - 1) / (1 + exp(z2 * 2))
-    return(r2)
-}
-
 # get meta data
 EMGmeta = data.table::fread(neatStats::path_neat("PrEMG_metaanalysis_data.txt"))
 EMG_stats = list()
 for (colnam in names(EMGmeta)) {
     if (is.numeric(EMGmeta[[colnam]])) {
-        EMG_stats[[colnam]] = list(
-            x_mean = mean(EMGmeta[[colnam]], na.rm = TRUE),
-            x_sd = sd(EMGmeta[[colnam]], na.rm = TRUE)
-        )
+        EMG_stats[[colnam]] = mean(EMGmeta[[colnam]], na.rm = TRUE)
     }
 }
 
@@ -65,6 +40,10 @@ pwr::pwr.t.test(power = 0.9,
                 n = total_size,
                 alternative = "two.sided")
 
+# comparing two correlations
+z_r2(.6, group_size)
+z_r2(.6, total_size)
+
 # TABLE
 
 # note: raw numbers are from the findings of Raud et al.'s main study
@@ -74,83 +53,112 @@ power_table = list(
     ## Individual-level variables
 
     # Response omission rate
+    omit_rate1 = mean_ci(sd = 1.74 , n = total_size),
+    omit_rate2 = mean_ci(sd = 1.74 , n = group_size),
+    omit_rate_d = 1.50 / 1.74,
 
     # Incorrect response rate
+    error_rate1 = mean_ci(sd = 1.07, n = total_size),
+    error_rate2 = mean_ci(sd = 1.07, n = group_size),
+    error_rate_d = 0.66 / 1.07,
 
     # RT mean/median
-    RTmean1 = mean_ci(sd = EMG_stats$goRTmean$x_sd, n = total_size),
-    RTmean2 = mean_ci(sd = EMG_stats$goRTmean$x_sd, n = group_size),
-    RTmean_d = EMG_stats$goRTmean$x_mean / EMG_stats$goRTmean$x_sd,
-
-    # RT variability
-    RTsd1 = mean_ci(sd = EMG_stats$goRTsd$x_sd, n = total_size),
-    RTsd2 = mean_ci(sd = EMG_stats$goRTsd$x_sd, n = group_size),
-    RTsd_d = EMG_stats$goRTsd$x_mean / EMG_stats$goRTsd$x_sd,
+    RTmean1 = mean_ci(sd = EMG_stats$goRTsd, n = total_size),
+    RTmean2 = mean_ci(sd = EMG_stats$goRTsd, n = group_size),
+    RTmean_d = EMG_stats$goRTmean / EMG_stats$goRTsd,
 
     # Response rate on stop trials
+    stop_error1 = mean_ci(sd = 2.09, n = total_size),
+    stop_error2 = mean_ci(sd = 2.09, n = group_size),
+    stop_error_d = 50 / 2.09,
 
     # RT on (unsuccessful) stop trials
+    stop_RT1 = mean_ci(sd = 72.64, n = total_size),
+    stop_RT2 = mean_ci(sd = 72.64, n = group_size),
+    stop_RT_d = 441.05 / 72.64,
 
     # Stop-signal delay mean
-    SSDmean1 = mean_ci(sd = EMG_stats$SSDmean$x_sd, n = total_size),
-    SSDmean2 = mean_ci(sd = EMG_stats$SSDmean$x_sd, n = group_size),
-    SSDmean_d = EMG_stats$SSDmean$x_mean / EMG_stats$SSDmean$x_sd,
-
-    # Stop-signal delay sd
-    SSDsd1 = mean_ci(sd = EMG_stats$SSDsd$x_sd, n = total_size),
-    SSDsd2 = mean_ci(sd = EMG_stats$SSDsd$x_sd, n = group_size),
-    SSDsd_d = EMG_stats$SSDsd$x_mean / EMG_stats$SSDsd$x_sd,
+    SSDmean1 = mean_ci(sd = EMG_stats$SSDsd, n = total_size),
+    SSDmean2 = mean_ci(sd = EMG_stats$SSDsd, n = group_size),
+    SSDmean_d = EMG_stats$SSDmean / EMG_stats$SSDsd,
 
     # SSRT mean
-    SSRTmean1 = mean_ci(sd = EMG_stats$SSRTmean$x_sd, n = total_size),
-    SSRTmean2 = mean_ci(sd = EMG_stats$SSRTmean$x_sd, n = group_size),
-    SSRTmean_d = EMG_stats$SSRTmean$x_mean / EMG_stats$SSRTmean$x_sd,
-
-    # SSRT sd
-    SSRTsd1 = mean_ci(sd = EMG_stats$SSRTsd$x_sd, n = total_size),
-    SSRTsd2 = mean_ci(sd = EMG_stats$SSRTsd$x_sd, n = group_size),
-    SSRTsd_d = EMG_stats$SSRTsd$x_mean / EMG_stats$SSRTsd$x_sd,
+    SSRTmean1 = mean_ci(sd = EMG_stats$SSRTsd, n = total_size),
+    SSRTmean2 = mean_ci(sd = EMG_stats$SSRTsd, n = group_size),
+    SSRTmean_d = EMG_stats$SSRTmean / EMG_stats$SSRTsd,
 
     # TFlatency mean
-    TFlatency_mean1 = mean_ci(sd = EMG_stats$EMGlatmean$x_sd, n = total_size),
-    TFlatency_mean2 = mean_ci(sd = EMG_stats$EMGlatmean$x_sd, n = group_size),
-    TFlatency_mean_d = EMG_stats$EMGlatmean$x_mean / EMG_stats$EMGlatmean$x_sd,
-
-    # TFlatency sd
-    TFlatency_sd1 = mean_ci(sd = EMG_stats$EMGlatsd$x_sd, n = total_size),
-    TFlatency_sd2 = mean_ci(sd = EMG_stats$EMGlatsd$x_sd, n = group_size),
-    TFlatency_sd_d = EMG_stats$EMGlatsd$x_mean / EMG_stats$EMGlatsd$x_sd,
+    TFlatency_mean1 = mean_ci(sd = EMG_stats$EMGlatsd, n = total_size),
+    TFlatency_mean2 = mean_ci(sd = EMG_stats$EMGlatsd, n = group_size),
+    TFlatency_mean_d = EMG_stats$EMGlatmean / EMG_stats$EMGlatsd,
 
     # TFfreq mean
-    TFfreq_mean1 = mean_ci(sd = EMG_stats$EMGfreqmean$x_sd, n = total_size),
-    TFfreq_mean2 = mean_ci(sd = EMG_stats$EMGfreqmean$x_sd, n = group_size),
-    TFfreq_mean_d = EMG_stats$EMGfreqmean$x_mean / EMG_stats$EMGfreqmean$x_sd,
-
-    # TFfreq sd
-    TFfreq_sd1 = mean_ci(sd = EMG_stats$EMGfreqsd$x_sd, n = total_size),
-    TFfreq_sd2 = mean_ci(sd = EMG_stats$EMGfreqsd$x_sd, n = group_size),
-    TFfreq_sd_d = EMG_stats$EMGfreqsd$x_mean / EMG_stats$EMGfreqsd$x_sd,
+    TFfreq_mean1 = mean_ci(sd = EMG_stats$EMGfreqsd, n = total_size),
+    TFfreq_mean2 = mean_ci(sd = EMG_stats$EMGfreqsd, n = group_size),
+    TFfreq_mean_d = EMG_stats$EMGfreqmean / EMG_stats$EMGfreqsd,
 
     ## Group-level variables:
 
     # goRT vs. SSRT correlation (r = −0.61)
-
-    # goRT vs. prTF correlation (r = −0.33)
-
-    # SSRT vs. prTF correlation
     RT_x_SSRT1 = presize::prec_cor(
-        r = EMG_stats$SSRT_prEMG_r$x_mean,
+        r = 0.61,
         n =  group_size,
         conf.level = .95,
         method = 'pearson'
     )$conf.width,
     RT_x_SSRT2 = presize::prec_cor(
-        r = EMG_stats$SSRT_prEMG_r$x_mean,
+        r = 0.61,
         n =  total_size,
         conf.level = .95,
         method = 'pearson'
     )$conf.width,
-    RT_x_SSRT_d = EMG_stats$SSRT_prEMG_r$x_mean
+    RT_x_SSRT_d = 0.61,
+
+    # goRT vs. prTF correlation (r = −0.33)
+    RT_x_EMG1 = presize::prec_cor(
+        r = 0.33,
+        n =  group_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    RT_x_EMG2 = presize::prec_cor(
+        r = 0.33,
+        n =  total_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    RT_x_EMG_d = 0.33,
+
+
+    # goRT vs. prTF frequency correlation (r = −0.33)
+    RT_x_EMGfreq1 = presize::prec_cor(
+        r = 0.35,
+        n =  group_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    RT_x_EMGfreq2 = presize::prec_cor(
+        r = 0.35,
+        n =  total_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    RT_x_EMGfreq_d = 0.35,
+
+    # SSRT vs. prTF correlation
+    EMG_x_SSRT1 = presize::prec_cor(
+        r = EMG_stats$SSRT_prEMG_r,
+        n =  group_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    EMG_x_SSRT2 = presize::prec_cor(
+        r = EMG_stats$SSRT_prEMG_r,
+        n =  total_size,
+        conf.level = .95,
+        method = 'pearson'
+    )$conf.width,
+    EMG_x_SSRT_d = EMG_stats$SSRT_prEMG_r
 )
 
 # high correlation CI
@@ -160,3 +168,22 @@ presize::prec_cor(
     conf.level = .95,
     method = 'pearson'
 )$conf.width
+
+
+# power for comparing two correlations
+pwr2ppl::depcorr0(
+    r12 = .7,
+    rxy = .824,
+    r1x = .5,
+    r1y = .5,
+    r2x = .5,
+    r2y = .5,
+    nlow = 200,
+    nhigh = 200
+)
+pwr2ppl::indcorr(
+    r1 = 0.7,
+    r2 = 0.91,
+    nlow = 100,
+    nhigh = 100
+)
