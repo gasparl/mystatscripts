@@ -1,0 +1,45 @@
+library('data.table')
+googlesheets4::gs4_deauth()
+gs_id = '1HPb-9SZ0LXAWOzyh6XsXaKhg_OCwmBS7nJc3ZUB38zg'
+
+gs_dat = data.table()
+for (gs_tab in googlesheets4::sheet_names(gs_id)) {
+    sheet_dat = as.data.table(googlesheets4::read_sheet(gs_id, sheet = gs_tab))
+    sheet_dat$journal = gs_tab
+    gs_dat = rbindlist(list(gs_dat, sheet_dat))
+}
+gs_dat$doi = sub('https://doi.org/', '', gs_dat$doi)
+
+# str(gs_dat)
+
+cref_dat = as.data.table(rcrossref::cr_works(dois = gs_dat$doi)$data)
+cref_dat_list = list()
+for (cref_doi in cref_dat$doi) {
+    cref_datx = cref_dat[doi == cref_doi]
+    cref_dat_list[[length(cref_dat_list) + 1]] =
+        c(
+            doi = cref_datx$doi,
+            journal2 = cref_datx$container.title,
+            date = cref_datx$published.print,
+            issued = cref_datx$issued,
+            citations = cref_datx$is.referenced.by.count,
+            title_full = cref_datx$title,
+            authors = nrow(cref_datx$author[[1]])
+        )
+}
+
+full_data = merge(gs_dat, as.data.table(do.call(rbind, cref_dat_list)), by = 'doi')
+if (any(full_data$journal != full_data$journal2)) {
+    stop('journal mismatch ',
+         paste(full_data$doi[full_data$journal != full_data$journal2], collapse = ', '))
+}
+if (!all(startsWith(full_data$title_full, full_data$title))) {
+    stop('title mismatch ',
+         paste(full_data$doi[!startsWith(full_data$title_full,
+                                         full_data$title)], collapse = ', '))
+}
+full_data$journal2 = NULL
+full_data$title = full_data$title_full
+full_data$title_full = NULL
+
+saveRDS(full_data, 'online_vs_offline_data.rds')
