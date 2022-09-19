@@ -1,4 +1,7 @@
 library('data.table')
+str_sum = function (x) {
+    sum(as.numeric(strsplit(as.character(x), ';')[[1]]))
+}
 googlesheets4::gs4_deauth()
 gs_id = '1HPb-9SZ0LXAWOzyh6XsXaKhg_OCwmBS7nJc3ZUB38zg'
 
@@ -8,6 +11,9 @@ for (gs_tab in googlesheets4::sheet_names(gs_id)) {
     sheet_dat$journal = gs_tab
     gs_dat = rbindlist(list(gs_dat, sheet_dat))
 }
+gs_dat$offline = unname(sapply(unlist(gs_dat$offline), str_sum))
+gs_dat$online = unname(sapply(unlist(gs_dat$online), str_sum))
+
 gs_dat$doi = sub('https://doi.org/', '', gs_dat$doi)
 
 # str(gs_dat)
@@ -42,4 +48,4 @@ full_data$journal2 = NULL
 full_data$title = full_data$title_full
 full_data$title_full = NULL
 
-saveRDS(full_data, 'online_vs_offline_data.rds')
+saveRDS(full_data, neatStats::path_neat('online_vs_offline_data.rds'))

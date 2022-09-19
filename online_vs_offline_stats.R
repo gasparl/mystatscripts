@@ -1,38 +1,38 @@
 library('ggplot2')
 library('data.table')
-library('lme4')
+library('trend')
+library('tsbox')
+library('ppcor')
 
 oo_data = readRDS(neatStats::path_neat('online_vs_offline_data.rds'))
 
-# tests
+names(oo_data)[names(oo_data) == "year"] = "time"
 
-mlm_full = lmer(
-  rt ~ item_type + trial_number +
-    item_type:trial_number +
-    (1 | subject_id) + (item_type | dataset),
-  data = metacit_dat, REML = FALSE
-)
+# replace outliers with ceiling
+oo_data_total$total = oo_data_total$offline + oo_data_total$online
+oo_data_total$ratio = oo_data_ratio$online / (oo_data_ratio$online + oo_data_ratio$offline)
+oo_data$total[oo_data$total > 1000] = 1000
 
-# mlm_full5 = glmer(
-#   rt ~ item_type + trial_number +
-#     item_type:trial_number +
-#     (1 | subject_id) + (item_type | dataset),
-#   data = metacit_dat, family = Gamma(link = "identity")
-# )
+# total samples
+oo_data_total = oo_data
+oo_data_total$value = oo_data_total$total
+ts_total = tsbox::ts_ts(oo_data_total[, c('time', 'journal', 'value')])
+ts_total[is.na(ts_total)] = 100
+mult.mk.test(ts_total)
 
-report::report(mlm_full)
 
-###
+# online ratio
+oo_data_ratio = oo_data
+oo_data_ratio$value = oo_data_ratio$ratio
+ts_ratio = tsbox::ts_ts(oo_data_ratio[, c('time', 'journal', 'value')])
+ts_ratio[is.na(ts_ratio)] = 100
+mult.mk.test(ts_ratio)
 
-mlm_xtrial = lmer(
-  rt ~ item_type + trial_number +
-    (item_type | subject_id) + (item_type | dataset),
-  data = metacit_dat, REML = FALSE
-)
+# citation and authorship
 
-aov_trials = anova(mlm_xtrial, mlm_full)
-aov_trials
+pcor.test(oo_data$total, oo_data$citations, oo_data$time)
+pcor.test(oo_data$ratio, oo_data$citations, oo_data$time)
 
-compp = performance::compare_performance(mlm_xtrial, mlm_full)
-compp
-plot(compp)
+pcor.test(oo_data$total, oo_data$authors, oo_data$time)
+pcor.test(oo_data$ratio, oo_data$citations, oo_data$time)
+
