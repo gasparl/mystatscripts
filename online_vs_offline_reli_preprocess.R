@@ -4,14 +4,14 @@ str_sum = function (x) {
         return(0)
     } else {
         return(sum(as.numeric(strsplit(
-            as.character(x), ';'
+            as.character(x), '[;]|[+]'
         )[[1]])))
     }
 }
 
-setwd(neatStats::path_neat('')) # set the result files' folder path as current working directory
+setwd(neatStats::path_neat('phase2')) # set the result files' folder path as current working directory
 
-filenames = list.files(pattern = "^p1_.*\\.xlsx$") # get all result file names
+filenames = list.files(pattern = "^online_.*\\.xlsx$") # get all result file names
 
 xls_dat = data.table()
 for (f_name in filenames) {
@@ -24,6 +24,8 @@ for (f_name in filenames) {
     }
 }
 xls_dat = Filter(function(x)!all(is.na(x)), xls_dat)
+
+xls_dat = xls_dat[!grepl('SKIP', xls_dat$notes, fixed = TRUE), ]
 
 xls_dat$offline = unname(sapply(unlist(xls_dat$offline), str_sum))
 xls_dat$online = unname(sapply(unlist(xls_dat$online), str_sum))

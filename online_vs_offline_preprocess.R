@@ -3,20 +3,37 @@ str_sum = function (x) {
     if (is.na(x)) {
         return(0)
     } else {
-        return(sum(as.numeric(strsplit(
-            as.character(x), ';'
-        )[[1]])))
+        return(sum(as.numeric(
+            strsplit(as.character(x), '[;]|[+]')[[1]]
+        )))
     }
 }
-googlesheets4::gs4_deauth()
-gs_id = '1HPb-9SZ0LXAWOzyh6XsXaKhg_OCwmBS7nJc3ZUB38zg'
+title_match = function(short, full) {
+    full = substr(full, 0, nchar(short))
+    if (nchar(full) > 10) {
+        short = substr(full, 0, nchar(full))
+    }
+    tolower(full_data$title)
+    return((adist(tolower(full), tolower(short)) < 4)[1])
+}
+
+
+setwd(neatStats::path_neat('phase3'))
+f_name = list.files(pattern = "^online_offline_studies_phase3_all.xlsx")[1] # get all result file names
 
 gs_dat = data.table()
-for (gs_tab in googlesheets4::sheet_names(gs_id)) {
-    sheet_dat = as.data.table(googlesheets4::read_sheet(gs_id, sheet = gs_tab))
-    sheet_dat$journal = gs_tab
-    gs_dat = rbindlist(list(gs_dat, sheet_dat))
+
+for (xls_tab in readxl::excel_sheets(f_name)) {
+    sheet_dat = as.data.table(readxl::read_xlsx(f_name, sheet = xls_tab))
+    sheet_dat$journal = xls_tab
+    sheet_dat = sheet_dat[!is.na(sheet_dat$year)]
+    gs_dat = rbindlist(list(gs_dat, sheet_dat), fill = TRUE)
 }
+
+gs_dat = Filter(function(x)!all(is.na(x)), gs_dat)
+
+gs_dat = gs_dat[!grepl('SKIP', gs_dat$notes, fixed = TRUE), ]
+
 gs_dat$offline = unname(sapply(unlist(gs_dat$offline), str_sum))
 gs_dat$online = unname(sapply(unlist(gs_dat$online), str_sum))
 
@@ -48,21 +65,27 @@ for (cref_doi in cref_dat$doi) {
 
 full_data = merge(gs_dat, as.data.table(do.call(rbind, cref_dat_list)), by = 'doi')
 
-for (replacer in list(c('&amp;', 'and'),
-                      c('Journal of Experimental Psychology:', 'JEP'))) {
+for (replacer in list(
+    c('&amp;', 'and'),
+    c('Journal of Experimental Psychology:', 'JEP'),
+    c(' PRPF', ''),
+    c(' Psychologische Forschung', '')
+)) {
     full_data$journal2 = sub(replacer[1], replacer[2], full_data$journal2)
 }
 if (any(full_data$journal != full_data$journal2)) {
     stop('journal mismatch ',
          paste(full_data$doi[full_data$journal != full_data$journal2], collapse = ', '))
 }
-if (!all(startsWith(tolower(full_data$title_full), tolower(full_data$title)))) {
+if (!all(mapply(title_match, full_data$title, full_data$title_full))) {
     stop('title mismatch ',
-         paste(full_data$title[!startsWith(tolower(full_data$title_full),
-                                          tolower(full_data$title))], collapse = ', '))
+         paste(full_data$title[!mapply(title_match,
+                                       full_data$title, full_data$title_full)], collapse = ', '))
 }
+
 full_data$journal2 = NULL
 full_data$title = full_data$title_full
 full_data$title_full = NULL
 
-saveRDS(full_data, neatStats::path_neat('online_vs_offline_data.rds'))
+saveRDS(full_data,
+        neatStats::path_neat('online_vs_offline_data.rds'))

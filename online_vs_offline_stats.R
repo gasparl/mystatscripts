@@ -34,6 +34,15 @@ ts_total = tsbox::ts_ts(jnl_data_total[, c('time', 'journal', 'value')])
 ts_total[is.na(ts_total)] = 100
 mult.mk.test(ts_total, alternative = 'greater')
 
+ggplot(jnl_data_total,aes(time, value)) +
+    stat_summary(geom = "line", fun.y = mean) +
+    stat_summary(geom = "ribbon", fun.data = mean_cl_normal, alpha = 0.3)
+
+ggplot(jnl_data_offline,aes(time, value)) +
+    stat_summary(geom = "line", fun.y = mean) +
+    stat_summary(geom = "ribbon", fun.data = mean_cl_normal, alpha = 0.3)
+
+
 # online ratio
 jnl_data_ratio = jnl_data
 jnl_data_ratio$value = jnl_data_ratio$ratio
@@ -51,13 +60,15 @@ mult.mk.test(ts_offline, alternative = 'greater')
 
 # citation and authorship
 
+oo_data$citations= as.numeric(oo_data$citations)
+oo_data$authors=as.numeric(oo_data$authors)
 pcor.test(oo_data$total, oo_data$citations, oo_data$time)
 pcor.test(oo_data$ratio, oo_data$citations, oo_data$time)
 
-pcor.test(oo_data$total, oo_data$authors, oo_data$time)
-pcor.test(oo_data$ratio, oo_data$authors, oo_data$time)
+pcor.test(oo_data$total, oo_data$authors, oo_data$time, method = "kendall")
+pcor.test(oo_data$ratio, oo_data$authors, oo_data$time, method = "kendall")
 
 pcor.test(oo_data$total, oo_data$ratio, oo_data$time)
-pcor.test(oo_data$authors, oo_data$citations, oo_data$time)
+pcor.test(oo_data$authors, oo_data$citations, oo_data$time, method = "kendall")
 
 
