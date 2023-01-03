@@ -7,7 +7,7 @@ setwd(path_neat('results_2a')) # set the result files' folder path as current wo
 filenames = list.files(pattern = "^numcog_.*\\.txt$") # get all result file names
 
 for (file_name in enum(filenames)) {
-    # file_name = c(0, "numcog_FYWC_220923100821.txt")
+    # file_name = c(0, filenames[1])
 
     # print current file name - just to monitor the process
     cat(file_name, fill = TRUE)
@@ -19,23 +19,18 @@ for (file_name in enum(filenames)) {
     )
 
     # check if trial number is correct
-    if (nrow(subject_data) != 513) {
+    if (!(nrow(subject_data) %in% c(433, 999))) {
         stop("unexpected trial number: ", nrow(subject_data))
-    } else if (!all(subject_data$trusted == TRUE)) {
+    } else if (!all(head(subject_data$trusted, -1) == TRUE)) {
         #stop("untrusted keypress")
     }
 
-    dems_row = subject_data[startsWith(subject_data$subject_id, 'dems')]
-    dems = as.list(setNames(strsplit(dems_row[[3]], "/")[[1]][-1], strsplit(dems_row[[2]], "/")[[1]][-1]))
+    dems_row = subject_data[startsWith(subject_data$subject_id, '{')]$subject_id
+    dems = jsonlite::fromJSON(dems_row)
+    dems$raf_samples = NULL
 
-    subject_data = subject_data[!(subject_data$phase == 'practice' | subject_data$subject_id == 'dems'),]
-    subject_data$num_type = ifelse((subject_data$digit > 5 &
-                                        subject_data$response_key == 'k') |
-                                       (subject_data$digit < 5 &
-                                            subject_data$response_key == 'd'),
-                                   'congr',
-                                   'incong'
-    )
+    subject_data = subject_data[!(subject_data$phase == 'practice' |
+                                      startsWith(subject_data$subject_id, '{')),]
     subject_data$rt_inraf = subject_data$keydown - subject_data$display_digit_now
     subject_data$rt_noraf = subject_data$keydown - subject_data$display_digit_noraf
     subject_data$rt_raf = subject_data$keydown - subject_data$display_digit
@@ -47,7 +42,7 @@ for (file_name in enum(filenames)) {
     rt_inraf = aggr_neat(
         subject_data,
         rt_inraf,
-        group_by = c('num_type'),
+        group_by = c('snarc'),
         method = mean,
         prefix = 'rt_inraf',
         filt = (valid == TRUE)
@@ -55,7 +50,7 @@ for (file_name in enum(filenames)) {
     rt_noraf = aggr_neat(
         subject_data,
         rt_noraf,
-        group_by = c('num_type'),
+        group_by = c('snarc'),
         method = mean,
         prefix = 'rt_noraf',
         filt = (valid == TRUE)
@@ -63,7 +58,7 @@ for (file_name in enum(filenames)) {
     rt_raf = aggr_neat(
         subject_data,
         rt_raf,
-        group_by = c('num_type'),
+        group_by = c('snarc'),
         method = mean,
         prefix = 'rt_raf',
         filt = (valid == TRUE)
@@ -75,7 +70,7 @@ for (file_name in enum(filenames)) {
     # merge subject data
     rbind_loop(
         subjects_merged,
-        subject_id = dems,
+        dems,
         er_overall = er_overall,
         rt_raf,
         rt_noraf,
@@ -93,18 +88,12 @@ str(subjects_merged)
 
 # exclude subjects with overall error rate congrr than 20%
 data_final = excl_neat(subjects_merged, er_overall < 0.20)
-data_final$rt_raf = data_final$rt_raf_incong - data_final$rt_raf_congr
-data_final$rt_noraf = data_final$rt_noraf_incong - data_final$rt_noraf_congr
-data_final$rt_inraf = data_final$rt_inraf_incong - data_final$rt_inraf_congr
+data_final$rt_raf = data_final$rt_raf_incong - data_final$rt_raf_cong
+data_final$rt_noraf = data_final$rt_noraf_incong - data_final$rt_noraf_cong
+data_final$rt_inraf = data_final$rt_inraf_incong - data_final$rt_inraf_cong
 
 # look at rt data range and distribution, potential outliers
-peek_neat(
-    data_final$rt_raf_incong,
-    values = c(
-        'rt_green_negative',
-        'rt_red_negative',
-        'rt_green_positive',
-        'rt_red_positive'
-    ),
-    f_plot = plot_neat
-)
+peek_neat(data_final,
+          values = c('rt_raf',
+                     'rt_noraf',
+                     'rt_inraf'))
