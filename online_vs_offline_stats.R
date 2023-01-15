@@ -6,6 +6,21 @@ library('tsbox')
 library('ppcor')
 library('neatStats')
 
+pcorr_ci = function(a, b, c, method) {
+    pcor_out = pcor.test(a, b, c, method = method)
+    pcor_out = c(pcor_out, ci_from_p(pcor_out$estimate, pcor_out$p.value))
+    neatStats:::prnt(paste0(
+        ro(pcor_out$estimate),
+        " [",
+        ro(pcor_out$ci_lower),
+        ", ",
+        ro(pcor_out$ci_upper),
+        "]",
+        ", p = ",
+        ro(pcor_out$p.value, 3)
+    ))
+}
+
 oo_data_full = readRDS(neatStats::path_neat('online_vs_offline_data.rds'))
 oo_data_full$journal[oo_data_full$journal == 'Psychonomic Bulletin and Review'] = 'Psychonomic Bul. & Rev.'
 names(oo_data_full)[names(oo_data_full) == "year"] = "time"
@@ -77,7 +92,7 @@ mult.mk.test(ts_offline)
 
 ##
 
-pcor.test(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
+pcorr_ci(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
 histstyle = list(xlab('Sample'), scale_x_continuous(limits = c(0, 2000)))
 #plot_neat(oo_data$total, binwidth = 30) + histstyle
 plot_neat(oo_data_full$online[oo_data_full$online > 0], binwidth = 30) + histstyle
@@ -93,7 +108,7 @@ ggplot(cref_data, aes(time, fill = journal)) +
 
 cref_data$citations = as.numeric(cref_data$citations)
 cref_data$authors = as.numeric(cref_data$authors)
-pcor.test(cref_data$total, cref_data$citations, cref_data$time)
+pcorr_ci(cref_data$total, cref_data$citations, cref_data$time)
 
 ggstatsplot::ggscatterstats(
     data = cref_data,
@@ -103,13 +118,12 @@ ggstatsplot::ggscatterstats(
     smooth.line.args = list(alpha = 0, linetype = 0)
 )
 
-pcor.test(cref_data$ratio, cref_data$citations, cref_data$time, method = "kendall")
+pcorr_ci(cref_data$ratio, cref_data$citations, cref_data$time, method = "kendall")
+pcorr_ci(cref_data$total, cref_data$authors, cref_data$time, method = "kendall")
 
-pcor.test(cref_data$total, cref_data$authors, cref_data$time, method = "kendall")
+pcorr_ci(cref_data$ratio, cref_data$authors, cref_data$time, method = "kendall")
 
-pcor.test(cref_data$ratio, cref_data$authors, cref_data$time, method = "kendall")
-
-pcor.test(cref_data$authors, cref_data$citations, cref_data$time, method = "kendall")
+pcorr_ci(cref_data$authors, cref_data$citations, cref_data$time, method = "kendall")
 
 ggstatsplot::ggscatterstats(
     data = cref_data,
