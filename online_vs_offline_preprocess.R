@@ -19,7 +19,7 @@ title_match = function(short, full) {
 
 
 setwd(neatStats::path_neat('phase3'))
-f_name = list.files(pattern = "^online_offline_studies_phase3_all.xlsx")[1] # get all result file names
+f_name = "online_offline_studies_phase3_ALL.xlsx" # get all result file names
 
 gs_dat = data.table()
 
@@ -29,6 +29,7 @@ for (xls_tab in readxl::excel_sheets(f_name)) {
     sheet_dat = sheet_dat[!is.na(sheet_dat$year)]
     gs_dat = rbindlist(list(gs_dat, sheet_dat), fill = TRUE)
 }
+
 
 gs_dat = Filter(function(x)!all(is.na(x)), gs_dat)
 
@@ -43,8 +44,9 @@ gs_dat$doi = sub('https://doi.org/', '', gs_dat$doi)
 
 if (anyDuplicated(gs_dat$doi)) {
     stop('doi duplicated ',
-         paste(full_data$doi[duplicated(full_data$doi)], collapse = ', '))
+         paste(gs_dat$doi[duplicated(gs_dat$doi)], collapse = ', '))
 }
+
 
 # cref_dat = as.data.table(rcrossref::cr_works(dois = unique(gs_dat$doi))$data)
 cref_dat = as.data.table(rcrossref::cr_works(dois = gs_dat$doi)$data)
@@ -63,7 +65,10 @@ for (cref_doi in cref_dat$doi) {
         )
 }
 
-full_data = merge(gs_dat, as.data.table(do.call(rbind, cref_dat_list)), by = 'doi')
+full_data = merge(gs_dat,
+                  as.data.table(do.call(rbind, cref_dat_list)),
+                  by = 'doi',
+                  all.x = TRUE)
 
 for (replacer in list(
     c('&amp;', 'and'),
@@ -73,14 +78,15 @@ for (replacer in list(
 )) {
     full_data$journal2 = sub(replacer[1], replacer[2], full_data$journal2)
 }
-if (any(full_data$journal != full_data$journal2)) {
+to_check = full_data[!is.na(full_data$journal2),]
+if (any(to_check$journal != to_check$journal2)) {
     stop('journal mismatch ',
-         paste(full_data$doi[full_data$journal != full_data$journal2], collapse = ', '))
+         paste(to_check$doi[to_check$journal != to_check$journal2], collapse = ', '))
 }
-if (!all(mapply(title_match, full_data$title, full_data$title_full))) {
+if (!all(mapply(title_match, to_check$title, to_check$title_full))
     stop('title mismatch ',
-         paste(full_data$title[!mapply(title_match,
-                                       full_data$title, full_data$title_full)], collapse = ', '))
+         paste(to_check$title[!mapply(title_match,
+                                      to_check$title, to_check$title_full)], collapse = ', '))
 }
 
 full_data$journal2 = NULL
