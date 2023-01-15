@@ -7,7 +7,7 @@ library('ppcor')
 library('neatStats')
 
 oo_data_full = readRDS(neatStats::path_neat('online_vs_offline_data.rds'))
-oo_data_full$journal[oo_data$journal == 'Psychonomic Bulletin and Review'] = 'Psychonomic Bul. & Rev.'
+oo_data_full$journal[oo_data_full$journal == 'Psychonomic Bulletin and Review'] = 'Psychonomic Bul. & Rev.'
 names(oo_data_full)[names(oo_data_full) == "year"] = "time"
 
 # just to check correct numbers of papers per year
@@ -15,16 +15,6 @@ ggplot(oo_data_full, aes(time, fill = journal)) +
     geom_bar() +
     theme_bw()
 
-# just to check cref and recorded year correspondance
-cref_years = oo_data_full[!is.na(oo_data_full$date.y)]
-
-if (!all(
-    cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4)) |
-    cref_years$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z')
-)) {
-    stop('year mismatch ',
-         paste(cref_years$doi[!cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4))], collapse = ', '))
-}
 
 # general numbers info
 oo_data_full$total = oo_data_full$offline + oo_data_full$online
@@ -85,7 +75,6 @@ mult.mk.test(ts_offline, alternative = 'greater')
 mult.mk.test(ts_offline)
 
 
-
 ##
 
 pcor.test(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
@@ -95,10 +84,7 @@ plot_neat(oo_data_full$online[oo_data_full$online > 0], binwidth = 30) + histsty
 plot_neat(oo_data_full$offline, binwidth = 30) + histstyle
 
 # citation and authorship
-
-cref_data = oo_data[!is.na(oo_data$citations) &
-                        !(oo_data$journal %in% c('Psychonomic Bulletin and Review',
-                                                 'JEP General')), ]
+cref_data = oo_data[!is.na(oo_data$citations), ]
 
 # numbers of papers per year with citation info
 ggplot(cref_data, aes(time, fill = journal)) +
@@ -120,7 +106,6 @@ ggstatsplot::ggscatterstats(
 pcor.test(cref_data$ratio, cref_data$citations, cref_data$time, method = "kendall")
 
 pcor.test(cref_data$total, cref_data$authors, cref_data$time, method = "kendall")
-
 
 pcor.test(cref_data$ratio, cref_data$authors, cref_data$time, method = "kendall")
 

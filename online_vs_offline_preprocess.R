@@ -38,7 +38,15 @@ gs_dat = gs_dat[!grepl('SKIP', gs_dat$notes, fixed = TRUE), ]
 gs_dat$offline = unname(sapply(unlist(gs_dat$offline), str_sum))
 gs_dat$online = unname(sapply(unlist(gs_dat$online), str_sum))
 
-gs_dat$doi = sub('https://doi.org/', '', gs_dat$doi)
+gs_dat$doi = tolower(
+    sub(
+        'https://doi.org/|http://dx.doi.org/|https://doi/|https://psycnet.apa.org/doi/',
+        '',
+        trimws(iconv(
+            gs_dat$doi, from = 'UTF-8', to = 'ASCII//TRANSLIT'
+        ))
+    )
+)
 
 # str(gs_dat)
 
@@ -47,9 +55,8 @@ if (anyDuplicated(gs_dat$doi)) {
          paste(gs_dat$doi[duplicated(gs_dat$doi)], collapse = ', '))
 }
 
-
 # cref_dat = as.data.table(rcrossref::cr_works(dois = unique(gs_dat$doi))$data)
-cref_dat = as.data.table(rcrossref::cr_works(dois = gs_dat$doi)$data)
+cref_dat = as.data.table(rcrossref::cr_works(dois = gs_dat$doi, .progress = 'time')$data)
 cref_dat_list = list()
 for (cref_doi in cref_dat$doi) {
     cref_datx = cref_dat[doi == cref_doi]
@@ -64,11 +71,20 @@ for (cref_doi in cref_dat$doi) {
             authors = nrow(cref_datx$author[[1]])
         )
 }
-
+cref_table = as.data.table(do.call(rbind, cref_dat_list))
+cref_table$doi = tolower(sub(
+    'https://doi.org/|http://dx.doi.org/|https://doi/',
+    '',
+    trimws(iconv(
+        cref_table$doi, from = 'UTF-8', to = 'ASCII//TRANSLIT'
+    ))
+))
 full_data = merge(gs_dat,
-                  as.data.table(do.call(rbind, cref_dat_list)),
+                  cref_table,
                   by = 'doi',
                   all.x = TRUE)
+
+# check missing CREF entries: noref = full_data[is.na(full_data$citations)]
 
 for (replacer in list(
     c('&amp;', 'and'),
@@ -83,10 +99,20 @@ if (any(to_check$journal != to_check$journal2)) {
     stop('journal mismatch ',
          paste(to_check$doi[to_check$journal != to_check$journal2], collapse = ', '))
 }
-if (!all(mapply(title_match, to_check$title, to_check$title_full))
+if (!all(mapply(title_match, to_check$title, to_check$title_full))) {
     stop('title mismatch ',
          paste(to_check$title[!mapply(title_match,
                                       to_check$title, to_check$title_full)], collapse = ', '))
+}
+
+# just to check cref and recorded year correspondence
+cref_years = full_data[!is.na(full_data$date.y)]
+if (!all(
+    cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4)) |
+    cref_years$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z')
+)) {
+    stop('year mismatch ',
+         paste(cref_years$doi[!cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4))], collapse = ', '))
 }
 
 full_data$journal2 = NULL
