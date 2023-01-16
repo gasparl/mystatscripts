@@ -57,13 +57,9 @@ peek_neat(oo_data_full[oo_data_full$online > 0],
           c('online'), group_by = 'journal')
 
 oo_data = oo_data_full
-max_sample = 2000 # preregistered: 1000
-# check number of outliers
-sum(oo_data$online > max_sample) / sum(oo_data$online > 0)
-sum(oo_data$offline > max_sample) / sum(oo_data$offline > 0)
 # replace outliers with ceiling
-oo_data$online[oo_data$online > max_sample] = max_sample
-oo_data$offline[oo_data$offline > max_sample] = max_sample
+oo_data$online[oo_data$online > 1000] = 1000
+oo_data$offline[oo_data$offline > 1000] = 1000
 oo_data$total = oo_data$offline + oo_data$online
 oo_data$ratio = oo_data$online / oo_data$total
 
@@ -98,6 +94,7 @@ ts_offline[is.na(ts_offline)] = 100
 mult.mk.test(ts_offline, alternative = 'greater')
 mult.mk.test(ts_offline)
 
+
 ##
 
 pcorr_ci(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
@@ -131,10 +128,7 @@ pcorr_ci(cref_data$total, cref_data$authors, cref_data$time, method = "kendall")
 
 pcorr_ci(cref_data$ratio, cref_data$authors, cref_data$time, method = "kendall")
 
-pcorr_ci(cref_data$authors,
-         cref_data$citations,
-         cref_data$time,
-         method = "kendall")
+pcorr_ci(cref_data$authors, cref_data$citations, cref_data$time, method = "kendall")
 
 ggstatsplot::ggscatterstats(
     data = cref_data,
@@ -147,47 +141,42 @@ ggstatsplot::ggscatterstats(
 
 # Figures
 
-# ggstyle = list(stat_summary(geom = "line", fun = mean),
-#                # stat_summary(
-#                #     geom = "ribbon",
-#                #     fun.data = mean_cl_normal,
-#                #     alpha = 0.1
-#                # ) ,
-#                theme_bw())
-#
-# ggplot(jnl_data_total, aes(time, value)) + ggstyle
-#
-# ggplot(jnl_data_ratio, aes(time, value)) + ggstyle
-#
-# ggplot(jnl_data_offline, aes(time, value)) + ggstyle
+ggstyle = list(
+    stat_summary(geom = "line", fun = mean),
+    # stat_summary(
+    #     geom = "ribbon",
+    #     fun.data = mean_cl_normal,
+    #     alpha = 0.1
+    # ) ,
+    theme_bw()
+)
+
+ggplot(jnl_data_total, aes(time, value)) + ggstyle
+
+ggplot(jnl_data_ratio, aes(time, value)) + ggstyle
+
+ggplot(jnl_data_offline, aes(time, value)) + ggstyle
 
 
 # Plot
 #names(jnl_data)
 aggr_data_long = melt(
     jnl_data,
-    id.vars = 'time',
-    # c('journal', 'time'),
+    id.vars = 'time', # c('journal', 'time'),
     variable.name = 'type',
     value.name = 'sample',
     measure.vars = c('online', 'offline')
 )
-
-labels = list(sum = 'Average Sample per Article',
-              count = 'Average Number of Studies per Article',
-              mean = 'Average Sample per Study')
-aggr_data_long = aggr_data_long[, .(sample = sum(sample) / 5), by = list(time, type)]
-
-mean(aggr_data_long$sample[aggr_data_long$type == 'online' & aggr_data_long$time <= 2012])
+aggr_data_long = aggr_data_long[, .(sample = sum(sample)/5), by = list(time,type)]
 
 ggplot(aggr_data_long, aes(x = time, y = sample, fill = type)) +
-    geom_area(alpha = 1,
+    geom_area(alpha = 0.9 ,
               size = .5,
               colour = "white") +
     scale_fill_viridis(discrete = T,
                        begin = .1,
-                       end = .9) +
-    ylab(labels[[current_type]]) +
+                       end = .9)+
+    ylab('Average Sample per Article') +
     xlab('Year') +
     theme_bw() + theme(
         panel.background = element_rect(fill = NA),
@@ -216,8 +205,7 @@ ggplot(jnl_data_long, aes(x = time, y = sample, fill = type)) +
                        begin = .1,
                        end = .9) +
     facet_grid(cols = vars(journal)) +
-    ylab(labels[[current_type]]) +
-    xlab('Year') +
+    ylab('Sample per Article') +
     theme_bw() + theme(
         panel.background = element_rect(fill = NA),
         panel.ontop = TRUE,
@@ -238,3 +226,5 @@ ggplot(jnl_data_long, aes(x = time, y = sample, fill = type)) +
 
 # online
 #((203*0.492+185*0.505) - (113*0.090+122*0.026))/2
+
+
