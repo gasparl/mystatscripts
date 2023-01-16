@@ -178,15 +178,7 @@ labels = list(sum = 'Average Sample per Article',
               mean = 'Average Sample per Study')
 aggr_data_long = aggr_data_long[, .(sample = sum(sample) / 5), by = list(time, type)]
 
-# numbers per halves
-mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
-                               aggr_data_long$time <= 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
-                               aggr_data_long$time > 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
-                               aggr_data_long$time <= 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
-                               aggr_data_long$time > 2012])
+mean(aggr_data_long$sample[aggr_data_long$type == 'online' & aggr_data_long$time <= 2012])
 
 ggplot(aggr_data_long, aes(x = time, y = sample, fill = type)) +
     geom_area(alpha = 1,
