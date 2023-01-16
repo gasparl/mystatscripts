@@ -1,13 +1,24 @@
 library('data.table')
-str_sum = function (x) {
-    if (is.na(x)) {
+str_fun = function (x, oper) {
+    if (is.na(x) | x == 0) {
         return(0)
     } else {
-        return(sum(as.numeric(
+        return(oper(as.numeric(
             strsplit(as.character(x), '[;]|[+]')[[1]]
         )))
     }
 }
+str_sum = function(x) {
+    return(str_fun(x, sum))
+}
+str_mean = function(x) {
+    return(str_fun(x, mean))
+}
+str_count = function(x) {
+    return(str_fun(x, length))
+}
+
+
 title_match = function(short, full) {
     full = substr(full, 0, nchar(short))
     if (nchar(full) > 10) {
@@ -35,8 +46,12 @@ gs_dat = Filter(function(x)!all(is.na(x)), gs_dat)
 
 gs_dat = gs_dat[!grepl('SKIP', gs_dat$notes, fixed = TRUE), ]
 
-gs_dat$offline = unname(sapply(unlist(gs_dat$offline), str_sum))
-gs_dat$online = unname(sapply(unlist(gs_dat$online), str_sum))
+gs_dat$offline_sum = unname(sapply(unlist(gs_dat$offline), str_sum))
+gs_dat$online_sum = unname(sapply(unlist(gs_dat$online), str_sum))
+gs_dat$offline_mean = unname(sapply(unlist(gs_dat$offline), str_mean))
+gs_dat$online_mean = unname(sapply(unlist(gs_dat$online), str_mean))
+gs_dat$offline_count = unname(sapply(unlist(gs_dat$offline), str_count))
+gs_dat$online_count = unname(sapply(unlist(gs_dat$online), str_count))
 
 gs_dat$doi = tolower(
     sub(
@@ -71,6 +86,7 @@ for (cref_doi in cref_dat$doi) {
             authors = nrow(cref_datx$author[[1]])
         )
 }
+
 cref_table = as.data.table(do.call(rbind, cref_dat_list))
 cref_table$doi = tolower(sub(
     'https://doi.org/|http://dx.doi.org/|https://doi/',
@@ -106,14 +122,18 @@ if (!all(mapply(title_match, to_check$title, to_check$title_full))) {
 }
 
 # just to check cref and recorded year correspondence
-cref_years = full_data[!is.na(full_data$date.y)]
-if (!all(
-    cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4)) |
-    cref_years$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z')
-)) {
+# (the two excluded DOIs were manually checked: the crossref data seems incorrect)
+cref_years = full_data[(!is.na(full_data$date.y)) & !(full_data$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z'))]
+if (!all(cref_years$year == as.numeric(substr(cref_years$date.y, 1, 4)))) {
     stop('year mismatch ',
-         paste(cref_years$doi[!cref_years$time == as.numeric(substr(cref_years$date.y, 1, 4))], collapse = ', '))
+         paste(cref_years$doi[!cref_years$year == as.numeric(substr(cref_years$date.y, 1, 4))], collapse = ', '))
 }
+cref_years_JEP = full_data[full_data$journal == 'JEP General']
+if (!all(cref_years_JEP$year == as.numeric(substr(cref_years_JEP$issued, 1, 4)))) {
+    stop('year mismatch ',
+         paste(cref_years_JEP$doi[!cref_years_JEP$year == as.numeric(substr(cref_years_JEP$issued, 1, 4))], collapse = ', '))
+}
+
 
 full_data$journal2 = NULL
 full_data$title = full_data$title_full
