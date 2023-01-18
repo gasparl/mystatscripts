@@ -1,5 +1,6 @@
 library('ggplot2')
 library('ggstatsplot')
+library('ggpubr')
 library('viridis')
 library('data.table')
 library('trend')
@@ -22,6 +23,10 @@ pcorr_ci = function(a, b, c, method = 'pearson') {
     ))
 }
 
+labels = list(sum = 'Average Sample per Article',
+              count = 'Average Number of Studies per Article',
+              mean = 'Average Sample per Study')
+
 oo_data_full = readRDS(neatStats::path_neat('online_vs_offline_data.rds'))
 oo_data_full$journal[oo_data_full$journal == 'Psychonomic Bulletin and Review'] = 'Psychonomic Bul. & Rev.'
 names(oo_data_full)[names(oo_data_full) == "year"] = "time"
@@ -35,7 +40,7 @@ ggplot(oo_data_full, aes(time, fill = journal)) +
 # sum: samples per article
 # count: numbers of studies per article
 # mean: samples per study (mean study sample per article)
-current_type = 'count' # sum / count / mean
+current_type = 'sum' # sum / count / mean
 
 oo_data_full$online =  oo_data_full[[paste0('online_', current_type)]]
 oo_data_full$offline =  oo_data_full[[paste0('offline_', current_type)]]
@@ -51,10 +56,48 @@ oo_data_full$ratio = oo_data_full$online / oo_data_full$total
 #     binwidth = 5,
 #     filt = (total < 500)
 # )
-peek_neat(oo_data_full[oo_data_full$offline > 0],
-          c('offline'), group_by = 'journal')
-peek_neat(oo_data_full[oo_data_full$online > 0],
-          c('online'), group_by = 'journal')
+
+# histogramm of offline and online samples
+histstyle = list(
+    ylab('Count'),
+    scale_x_continuous(limits = c(0, 2500)),
+    theme(plot.margin = margin(30, 1, 1, 1))
+)
+
+offs = oo_data_full$offline[oo_data_full$offline > 0]
+ons = oo_data_full$online[oo_data_full$online > 0]
+ggpubr::ggarrange(
+    plot_neat(offs,
+              binwidth = 30,
+              parts = c("h", "b")) + histstyle + xlab(paste0('Sample per Article')),
+    plot_neat(ons,
+              binwidth = 30,
+              parts = c("h", "b")) + histstyle + xlab('Sample per Article') +
+        theme(axis.title.y = element_text(margin = margin(
+            t = 0,
+            r = 10,
+            b = 0,
+            l = 0
+        ))),
+    ncol = 1,
+    labels = c(
+        paste0('Offline', ' (N = ', length(offs), ')'),
+        paste0('Online', ' (N = ', length(ons), ')')
+    ),
+    label.y = 0.95,
+    label.x = 0.21
+)
+# box plots of offline and online samples per journal
+peek_style = list(ylab(sub('Average ', '', labels[[current_type]])), theme(plot.margin = margin(30, 1, 1, 1)))
+ggpubr::ggarrange(
+    peek_neat(oo_data_full[oo_data_full$offline > 0],
+              c('offline'), group_by = 'journal') + peek_style,
+    peek_neat(oo_data_full[oo_data_full$online > 0],
+              c('online'), group_by = 'journal', ) + peek_style,
+    ncol = 1,
+    labels = c('Offline', 'Online'),
+    label.y = 0.96, label.x = 0.45
+)
 
 oo_data_full$type = ifelse(
     oo_data_full$offline == 0,
@@ -63,10 +106,12 @@ oo_data_full$type = ifelse(
 )
 
 oo_data = oo_data_full
-max_sample = 2000 # preregistered: 1000
+max_sample = 1000 # preregistered: 1000
 # check number of outliers
 sum(oo_data$online > max_sample) / sum(oo_data$online > 0)
 sum(oo_data$offline > max_sample) / sum(oo_data$offline > 0)
+(sum(oo_data$online > max_sample) + sum(oo_data$offline > max_sample)) /
+    (sum(oo_data$online > 0) + sum(oo_data$offline > 0))
 # replace outliers with ceiling
 oo_data$online[oo_data$online > max_sample] = max_sample
 oo_data$offline[oo_data$offline > max_sample] = max_sample
@@ -80,14 +125,12 @@ jnl_data = oo_data[, .(
     ratio = mean(ratio)
 ), by = c('journal', 'time')]
 
-
 # total samples
 jnl_data_total = jnl_data
 jnl_data_total$value = jnl_data_total$total
 ts_total = tsbox::ts_ts(jnl_data_total[, c('time', 'journal', 'value')])
 ts_total[is.na(ts_total)] = 100
 mult.mk.test(ts_total, alternative = 'greater')
-
 
 # online ratio
 jnl_data_ratio = jnl_data
@@ -107,10 +150,6 @@ mult.mk.test(ts_offline)
 ##
 
 pcorr_ci(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
-histstyle = list(xlab('Sample'), scale_x_continuous(limits = c(0, 2000)))
-#plot_neat(oo_data$total, binwidth = 30) + histstyle
-plot_neat(oo_data_full$online[oo_data_full$online > 0], binwidth = 30) + histstyle
-plot_neat(oo_data_full$offline, binwidth = 30) + histstyle
 
 # citation and authorship
 cref_data = oo_data # oo_data[is.na(oo_data$citations), ]
@@ -179,9 +218,6 @@ aggr_data_long = melt(
     measure.vars = c('online', 'offline')
 )
 
-labels = list(sum = 'Average Sample per Article',
-              count = 'Average Number of Studies per Article',
-              mean = 'Average Sample per Study')
 aggr_data_long = aggr_data_long[, .(sample = sum(sample) / 5), by = list(time, type)]
 
 # numbers per halves
@@ -245,6 +281,8 @@ ggplot(jnl_data_long, aes(x = time, y = sample, fill = type)) +
 ## RATIOS of sample articles per samples involved
 
 ratios_long = oo_data_full[, .(Ratio = .N / 50), by = list(time,type)]
+
+# imputing zeros for missing types per year
 ratios_long = melt(
     dcast(ratios_long, time ~ type, value.var = 'Ratio'),
     measure.vars = c("online", "mixed", "offline"),

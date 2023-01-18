@@ -53,6 +53,9 @@ gs_dat$online_mean = unname(sapply(unlist(gs_dat$online), str_mean))
 gs_dat$offline_count = unname(sapply(unlist(gs_dat$offline), str_count))
 gs_dat$online_count = unname(sapply(unlist(gs_dat$online), str_count))
 
+gs_dat$entry_date = gs_dat$date
+gs_dat$date = NULL
+
 gs_dat$doi = tolower(
     sub(
         'https://doi.org/|http://dx.doi.org/|https://doi/|https://psycnet.apa.org/doi/',
@@ -64,7 +67,6 @@ gs_dat$doi = tolower(
 )
 
 # str(gs_dat)
-
 if (anyDuplicated(gs_dat$doi)) {
     stop('doi duplicated ',
          paste(gs_dat$doi[duplicated(gs_dat$doi)], collapse = ', '))
@@ -123,10 +125,10 @@ if (!all(mapply(title_match, to_check$title, to_check$title_full))) {
 
 # just to check cref and recorded year correspondence
 # (the two excluded DOIs were manually checked: the crossref data seems incorrect)
-cref_years = full_data[(!is.na(full_data$date.y)) & !(full_data$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z'))]
-if (!all(cref_years$year == as.numeric(substr(cref_years$date.y, 1, 4)))) {
+cref_years = full_data[(!is.na(full_data$date)) & !(full_data$doi %in% c('10.1007/s00426-006-0074-2', '10.1007/s00426-006-0077-z'))]
+if (!all(cref_years$year == as.numeric(substr(cref_years$date, 1, 4)))) {
     stop('year mismatch ',
-         paste(cref_years$doi[!cref_years$year == as.numeric(substr(cref_years$date.y, 1, 4))], collapse = ', '))
+         paste(cref_years$doi[!cref_years$year == as.numeric(substr(cref_years$date, 1, 4))], collapse = ', '))
 }
 cref_years_JEP = full_data[full_data$journal == 'JEP General']
 if (!all(cref_years_JEP$year == as.numeric(substr(cref_years_JEP$issued, 1, 4)))) {
