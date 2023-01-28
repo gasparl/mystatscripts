@@ -12,6 +12,7 @@ pcorr_ci = function(a, b, c, method = 'pearson') {
     pcor_out = pcor.test(a, b, c, method = method)
     pcor_out = c(pcor_out, ci_from_p(pcor_out$estimate, pcor_out$p.value))
     neatStats:::prnt(paste0(
+        'τ = ',
         ro(pcor_out$estimate),
         " [",
         ro(pcor_out$ci_lower),
@@ -24,7 +25,7 @@ pcorr_ci = function(a, b, c, method = 'pearson') {
 }
 
 labels = list(sum = 'Average Sample per Article',
-              count = 'Average Number of Studies per Article',
+              count = 'Studies per Article',
               mean = 'Average Sample per Study')
 
 oo_data_full = readRDS(neatStats::path_neat('online_vs_offline_data.rds'))
@@ -40,7 +41,13 @@ ggplot(oo_data_full, aes(time, fill = journal)) +
 # sum: samples per article
 # count: numbers of studies per article
 # mean: samples per study (mean study sample per article)
-current_type = 'sum' # sum / count / mean
+current_type = 'mean' # sum / count / mean
+
+if (current_type == 'mean') {
+    labels = Map(function(x) {
+        sub('Article', 'Study', x)
+    }, labels)
+}
 
 oo_data_full$online =  oo_data_full[[paste0('online_', current_type)]]
 oo_data_full$offline =  oo_data_full[[paste0('offline_', current_type)]]
@@ -61,7 +68,10 @@ oo_data_full$ratio = oo_data_full$online / oo_data_full$total
 histstyle = list(
     ylab('Count'),
     scale_x_continuous(limits = c(0, 2500)),
-    theme(plot.margin = margin(30, 1, 1, 1))
+    theme(
+        #plot.margin = margin(1, 1, 1, 1),
+        #plot.title = element_text(hjust = 0.5)
+    )
 )
 
 offs = oo_data_full$offline[oo_data_full$offline > 0]
@@ -69,34 +79,28 @@ ons = oo_data_full$online[oo_data_full$online > 0]
 ggpubr::ggarrange(
     plot_neat(offs,
               binwidth = 30,
-              parts = c("h", "b")) + histstyle + xlab(paste0('Sample per Article')),
+              parts = c("h", "b")) + histstyle + xlab(sub('Average ', '', labels[[current_type]])) +
+        ggtitle(paste0('(A) Offline (N = ', length(offs), ')')),
     plot_neat(ons,
               binwidth = 30,
-              parts = c("h", "b")) + histstyle + xlab('Sample per Article') +
+              parts = c("h", "b")) + histstyle + xlab(sub('Average ', '', labels[[current_type]])) +
+        ggtitle(paste0('(B) Online (N = ', length(ons), ')')) +
         theme(axis.title.y = element_text(margin = margin(
             t = 0,
             r = 10,
             b = 0,
             l = 0
         ))),
-    ncol = 1,
-    labels = c(
-        paste0('Offline', ' (N = ', length(offs), ')'),
-        paste0('Online', ' (N = ', length(ons), ')')
-    ),
-    label.y = 0.95,
-    label.x = 0.21
+    ncol = 1
 )
 # box plots of offline and online samples per journal
-peek_style = list(ylab(sub('Average ', '', labels[[current_type]])), theme(plot.margin = margin(30, 1, 1, 1)))
+peek_style = list(ylab(sub('Average ', '', labels[[current_type]])))
 ggpubr::ggarrange(
     peek_neat(oo_data_full[oo_data_full$offline > 0],
-              c('offline'), group_by = 'journal') + peek_style,
+              c('offline'), group_by = 'journal') + peek_style + ggtitle('(A) Offline'),
     peek_neat(oo_data_full[oo_data_full$online > 0],
-              c('online'), group_by = 'journal', ) + peek_style,
-    ncol = 1,
-    labels = c('Offline', 'Online'),
-    label.y = 0.96, label.x = 0.45
+              c('online'), group_by = 'journal',) + peek_style + ggtitle('(B) Online'),
+    ncol = 1
 )
 
 oo_data_full$type = ifelse(
@@ -106,7 +110,7 @@ oo_data_full$type = ifelse(
 )
 
 oo_data = oo_data_full
-max_sample = 1000 # preregistered: 1000
+max_sample = 2500 # preregistered: 1000; revised: 2500
 # check number of outliers
 sum(oo_data$online > max_sample) / sum(oo_data$online > 0)
 sum(oo_data$offline > max_sample) / sum(oo_data$offline > 0)
@@ -131,6 +135,7 @@ jnl_data_total$value = jnl_data_total$total
 ts_total = tsbox::ts_ts(jnl_data_total[, c('time', 'journal', 'value')])
 ts_total[is.na(ts_total)] = 100
 mult.mk.test(ts_total, alternative = 'greater')
+# mult.mk.test(ts_total)
 
 # online ratio
 jnl_data_ratio = jnl_data
@@ -138,13 +143,14 @@ jnl_data_ratio$value = jnl_data_ratio$ratio
 ts_ratio = tsbox::ts_ts(jnl_data_ratio[, c('time', 'journal', 'value')])
 ts_ratio[is.na(ts_ratio)] = 100
 mult.mk.test(ts_ratio, alternative = 'greater')
+# mult.mk.test(ts_ratio)
 
 # offline alone
 jnl_data_offline = jnl_data
 jnl_data_offline$value = jnl_data_offline$offline
 ts_offline = tsbox::ts_ts(jnl_data_offline[, c('time', 'journal', 'value')])
 ts_offline[is.na(ts_offline)] = 100
-mult.mk.test(ts_offline, alternative = 'greater')
+#mult.mk.test(ts_offline, alternative = 'greater')
 mult.mk.test(ts_offline)
 
 ##
@@ -155,13 +161,13 @@ pcorr_ci(oo_data$total, oo_data$ratio, oo_data$time, method = "kendall")
 cref_data = oo_data # oo_data[is.na(oo_data$citations), ]
 
 # numbers of papers per year with citation info
-ggplot(cref_data, aes(time, fill = journal)) +
-    geom_bar() +
-    theme_bw()
+# ggplot(cref_data, aes(time, fill = journal)) +
+#     geom_bar() +
+#     theme_bw()
 
 cref_data$citations = as.numeric(cref_data$citations)
 cref_data$authors = as.numeric(cref_data$authors)
-pcorr_ci(cref_data$total, cref_data$citations, cref_data$time)
+pcorr_ci(cref_data$total, cref_data$citations, cref_data$time, method = "kendall")
 
 ggstatsplot::ggscatterstats(
     data = cref_data,
@@ -220,23 +226,22 @@ aggr_data_long = melt(
 
 aggr_data_long = aggr_data_long[, .(sample = sum(sample) / 5), by = list(time, type)]
 
-# numbers per halves
-mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
-                               aggr_data_long$time <= 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
-                               aggr_data_long$time > 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
-                               aggr_data_long$time <= 2012])
-mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
-                               aggr_data_long$time > 2012])
-
+virid = 'viridis'
+begining = .1
+ending = .9
+# if (current_type == 'count') {
+#     virid = 'mako'
+#     begining = .3
+#     ending = .7
+# }
 ggplot(aggr_data_long, aes(x = time, y = sample, fill = type)) +
     geom_area(alpha = 1,
               size = .5,
               colour = "white") +
     scale_fill_viridis(discrete = T,
-                       begin = .1,
-                       end = .9) +
+                       begin = begining,
+                       end = ending,
+                       option = virid) + # mako / turbo virid
     ylab(labels[[current_type]]) +
     xlab('Year') +
     theme_bw() + theme(
@@ -247,6 +252,16 @@ ggplot(aggr_data_long, aes(x = time, y = sample, fill = type)) +
         panel.grid.major.x = element_blank(),
         legend.title = element_blank()
     )#+ggtitle("Experimental Psychology Sample Sizes from 2003 to 2022")
+
+# numbers per halves
+mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
+                               aggr_data_long$time <= 2012])
+mean(aggr_data_long$sample[aggr_data_long$type == 'online' &
+                               aggr_data_long$time > 2012])
+mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
+                               aggr_data_long$time <= 2012])
+mean(aggr_data_long$sample[aggr_data_long$type == 'offline' &
+                               aggr_data_long$time > 2012])
 
 # PER JOURNAL
 jnl_data_long = melt(
@@ -263,8 +278,9 @@ ggplot(jnl_data_long, aes(x = time, y = sample, fill = type)) +
               size = .5,
               colour = "white") +
     scale_fill_viridis(discrete = T,
-                       begin = .1,
-                       end = .9) +
+                       begin = begining,
+                       end = ending,
+                       option = virid) +
     facet_grid(cols = vars(journal)) +
     ylab(labels[[current_type]]) +
     xlab('Year') +
@@ -274,9 +290,11 @@ ggplot(jnl_data_long, aes(x = time, y = sample, fill = type)) +
         panel.grid.minor.y = element_blank(),
         panel.grid.minor.x = element_blank(),
         panel.grid.major.x = element_blank(),
-        legend.title = element_blank()
+        strip.background = element_blank(),
+        strip.text = element_text(face = 'bold'),
+        legend.title = element_blank(),
+        legend.position = 'bottom'
     ) #+ ggtitle("Experimental Psychology Sample Sizes from 2003 to 2022")
-
 
 ## RATIOS of sample articles per samples involved
 
